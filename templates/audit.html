@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Audit Trail — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Audit Trail</h1>
+  <p>// LOGIN / LOGOUT / ACTION AUDIT LOG &mdash; ADMIN + ANALYST VIEW</p>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <tr><th>User</th><th>Event</th><th>Timestamp</th><th>IP Address</th></tr>
+    {% if not rows %}
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">No audit events yet.</td></tr>
+    {% endif %}
+    {% for username, event, ts, ip in rows %}
+    {% set ts_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts|float)) if ts else '' %}
+    {% set ev_key = event.split()[0] %}
+    {% if ev_key == 'LOGIN' %}{% set bcls = 'badge-safe' %}
+    {% elif ev_key == 'LOGOUT' %}{% set bcls = 'badge-info' %}
+    {% elif ev_key == 'FAILED_LOGIN' %}{% set bcls = 'badge-danger' %}
+    {% else %}{% set bcls = 'badge-warn' %}{% endif %}
+    <tr>
+      <td>{{ username }}</td>
+      <td><span class="badge {{ bcls }}" style="font-size:9px">{{ event }}</span></td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">{{ ts_str }}</td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">{{ ip }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

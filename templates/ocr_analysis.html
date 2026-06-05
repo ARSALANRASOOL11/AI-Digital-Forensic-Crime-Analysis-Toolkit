@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}OCR Evidence Analysis{% endblock %}
+{% block content %}
+<div class="page-header"><h1>OCR Evidence Analysis</h1><p>// EXTRACT TEXT · URLs · EMAILS · IPs · WALLETS · PHONES FROM IMAGES & PDFs</p></div>
+<div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Select Image / PDF</div>
+    <form method="POST" id="ocrForm">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% for r in ev_rows %}
+      <div class="card" style="padding:10px 14px;margin-bottom:7px;cursor:pointer;{% if result and result.ev_id|string==r[0]|string %}border-color:var(--accent);background:rgba(0,255,231,.06){% endif %}"
+           onclick="document.getElementById('evId').value='{{r[0]}}';document.getElementById('ocrForm').submit()">
+        <div style="font-size:12px;color:#fff">{{r[2]}}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{r[1]}}</div>
+      </div>
+      {% else %}<p style="color:var(--muted);font-size:13px">No evidence uploaded.</p>{% endfor %}
+      <input type="hidden" name="ev_id" id="evId">
+    </form>
+  </div>
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🔤</div>
+      <p>Select an image or PDF file to extract text and IOCs using OCR.</p>
+      <p style="font-size:11px;margin-top:10px;color:var(--muted)">Supports: JPG, PNG, BMP, TIFF, GIF, PDF · Engine: Tesseract 5</p>
+    </div>
+    {% else %}
+    {% if not result.success %}
+    <div class="alert alert-error">✘ {{ result.error }}</div>
+    {% else %}
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" style="color:{% if result.scoring.score>=70 %}var(--danger){% elif result.scoring.score>=30 %}var(--warn){% else %}var(--safe){% endif %}">{{result.scoring.score}}</div><div class="stat-label">Threat Score</div></div>
+      <div class="stat-card"><div class="stat-value">{{result.scoring.ioc_count}}</div><div class="stat-label">IOCs Found</div></div>
+      <div class="stat-card"><div class="stat-value">{{result.pages|length}}</div><div class="stat-label">Pages</div></div>
+      <div class="stat-card"><div class="stat-value" style="font-size:13px">{{result.engine}}</div><div class="stat-label">OCR Engine</div></div>
+    </div>
+    {% if result.scoring.categories %}
+    <div class="card" style="margin-bottom:14px;padding:12px 18px;border-color:rgba(255,60,60,.3)">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">⚠ CRIME CATEGORIES DETECTED</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {% for cat in result.scoring.categories %}<span class="badge badge-danger">{{cat}}</span>{% endfor %}
+      </div>
+      {% if result.scoring.kw_hits %}
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Keywords: {{result.scoring.kw_hits[:6]|join(', ')}}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <!-- IOCs -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Extracted IOCs</div>
+      {% set iocs = result.iocs %}
+      {% for ioc_type, values in iocs.items() %}{% if values %}
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--accent);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:5px">{{ioc_type.upper()}} ({{values|length}})</div>
+        {% for v in values[:6] %}<span style="font-family:'Share Tech Mono',monospace;font-size:11px;background:var(--panel);padding:2px 8px;border-radius:3px;margin:2px;display:inline-block;color:var(--text)">{{v[:60]}}</span>{% endfor %}
+      </div>
+      {% endif %}{% endfor %}
+      {% if not iocs or iocs.values()|list|sum(start=[])|length == 0 %}
+      <p style="color:var(--muted);font-size:12px">No IOCs extracted from this file.</p>
+      {% endif %}
+    </div>
+    <!-- Extracted Text -->
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Extracted Text ({{result.full_text|length}} chars)</div>
+      <pre style="background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:12px;font-size:11px;color:var(--text);white-space:pre-wrap;max-height:300px;overflow-y:auto;font-family:'Share Tech Mono',monospace">{{result.full_text[:3000] or '(no text extracted)'}}</pre>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

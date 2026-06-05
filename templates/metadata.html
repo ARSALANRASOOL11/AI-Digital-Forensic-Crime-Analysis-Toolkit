@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Metadata Analysis — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Metadata Analysis</h1>
+  <p>// AI-POWERED FILE METADATA &amp; RISK INSPECTION</p>
+</div>
+
+<div style="display:grid;grid-template-columns:270px 1fr;gap:18px;align-items:start">
+
+  <!-- File list -->
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+      Select Evidence File
+    </div>
+    {% for r in all_rows %}
+    {% set risk = ai_risk_score(r[2], r[3]) %}
+    <a href="{{ url_for('metadata', cid=r[1], filename=r[2]) }}" style="text-decoration:none">
+      <div class="card" style="padding:10px 14px;margin-bottom:7px;cursor:pointer;
+        {% if r[1] == cid and r[2] == filename %}border-color:var(--accent);background:rgba(0,255,231,.06){% endif %}">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:12px;color:#fff">{{ r[2] }}</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{ r[1] }}</div>
+          </div>
+          <span class="badge {% if risk.level == 'HIGH_RISK' %}badge-danger{% elif risk.level == 'MEDIUM_RISK' %}badge-warn{% elif risk.level == 'LOW_RISK' %}badge-info{% else %}badge-safe{% endif %}">
+            {{ risk.score }}
+          </span>
+        </div>
+      </div>
+    </a>
+    {% else %}
+    <p style="color:var(--muted);font-size:13px">No evidence uploaded yet.</p>
+    {% endfor %}
+  </div>
+
+  <!-- Detail panel -->
+  <div>
+    {% if selected %}
+    {% set r = selected.row %}
+    {% set risk = selected.risk %}
+    {% set meta = selected.meta %}
+    {% set yara = selected.yara %}
+    {% set sc = risk.score %}
+    {% if sc >= 70 %}{% set sc_color = 'var(--danger)' %}
+    {% elif sc >= 35 %}{% set sc_color = 'var(--warn)' %}
+    {% else %}{% set sc_color = 'var(--safe)' %}{% endif %}
+
+    <div class="card" style="max-width:680px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#fff">{{ r[2] }}</div>
+          <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px">{{ r[1] }}</div>
+        </div>
+        <span class="badge {% if risk.level == 'HIGH_RISK' %}badge-danger{% elif risk.level in ('MEDIUM_RISK','LOW_RISK') %}badge-warn{% else %}badge-safe{% endif %}" style="font-size:11px;padding:4px 12px">
+          {{ risk.level.replace('_',' ') }} &bull; {{ sc }}/100
+        </span>
+      </div>
+
+      <!-- Risk bar -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:8px">AI Risk Analysis</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="flex:1;background:rgba(255,255,255,.05);border-radius:20px;height:8px">
+            <div style="width:{{ sc }}%;height:8px;border-radius:20px;background:{{ sc_color }}"></div>
+          </div>
+          <span style="font-size:15px;font-weight:800;color:{{ sc_color }};font-family:'Share Tech Mono',monospace">{{ sc }}/100</span>
+        </div>
+        <ul style="list-style:none;padding:0">
+          {% for reason in risk.reasons %}
+          <li style="margin-bottom:3px;font-size:12px;color:var(--text)">&#9679; {{ reason }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- YARA hits -->
+      {% if yara %}
+      <div style="margin-bottom:18px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--warn);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:8px">
+          &#9888; YARA MATCHES ({{ yara|length }})
+        </div>
+        {% for hit in yara %}
+        <div class="yara-hit {% if hit.severity == 'CRITICAL' %}yara-critical{% endif %}">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">
+            <span class="badge {% if hit.severity == 'CRITICAL' %}badge-danger{% elif hit.severity == 'HIGH' %}badge-warn{% else %}badge-info{% endif %}">{{ hit.severity }}</span>
+            <strong style="font-size:12px;color:var(--accent)">{{ hit.rule }}</strong>
+          </div>
+          <div style="font-size:11px;color:var(--text)">{{ hit.description }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Metadata table -->
+      <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:8px">Extracted Metadata</div>
+      <table class="meta-table">
+        {% for k, v in meta.items() %}
+        <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    {% else %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:12px">&#128203;</div>
+      Select a file on the left to view its metadata and AI risk analysis.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

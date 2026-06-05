@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}CNN / ML Analysis — Forensic Toolkit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>CNN / ML Analysis</h1>
+  <p>// DEEP LEARNING FILE CLASSIFICATION &mdash; CONFUSION MATRIX &amp; PRECISION/RECALL</p>
+</div>
+
+{% if not evidence_rows %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+  <div style="font-size:36px;margin-bottom:12px">&#129504;</div>
+  <p>No evidence uploaded yet. Upload files to generate CNN analysis.</p>
+</div>
+{% else %}
+
+<!-- Summary stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value">{{ cm_data.total_samples }}</div>
+    <div class="stat-label">Samples</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--safe)">{{ cm_data.accuracy }}%</div>
+    <div class="stat-label">Accuracy</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--accent)">{{ cm_data.classes|length }}</div>
+    <div class="stat-label">Classes</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--accent2)">CNN</div>
+    <div class="stat-label">Model Type</div>
+  </div>
+</div>
+
+<!-- Architecture note -->
+<div class="card" style="padding:14px 18px;margin-bottom:18px;border-color:rgba(0,136,255,.3)">
+  <div style="font-size:11px;color:var(--accent2);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:6px">&#129504; CNN ARCHITECTURE NOTE</div>
+  <p style="font-size:12px;color:var(--text);line-height:1.7">
+    This system extracts 7 numerical features per file (extension risk, double extension, byte entropy,
+    magic byte mismatch, suspicious keyword density, YARA score, file size category) and passes them
+    through a simulated CNN forward pass with learned weight layers. The confusion matrix below shows
+    predicted vs. actual classification across {{ cm_data.classes|length }} forensic risk classes.
+  </p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+
+  <!-- Confusion Matrix -->
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+      &#9632; Confusion Matrix
+    </div>
+    <div class="confusion-matrix" style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th class="cm-axis-label" style="text-align:right;padding-right:8px">Actual ↓ / Predicted →</th>
+            {% for cls in cm_data.classes %}
+            <th>{{ cls }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for i, row_cls in enumerate(cm_data.classes) %}
+          <tr>
+            <th style="text-align:right;padding-right:8px;color:var(--text)">{{ row_cls }}</th>
+            {% for j, val in enumerate(cm_data.matrix[i]) %}
+            <td class="{% if i == j %}diagonal{% endif %}" style="{% if val > 0 and i != j %}color:var(--danger){% endif %}">
+              {{ val }}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">
+      <span style="color:var(--safe)">&#9632;</span> Diagonal = correct predictions &nbsp;
+      <span style="color:var(--danger)">&#9632;</span> Off-diagonal = misclassifications
+    </div>
+  </div>
+
+  <!-- Accuracy Graph -->
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+      &#128200; Accuracy Over Samples
+    </div>
+    <canvas id="accCanvas" width="380" height="200" style="width:100%;max-width:380px"></canvas>
+  </div>
+</div>
+
+<!-- Precision / Recall / F1 -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+      &#9632; Precision / Recall Chart
+    </div>
+    <canvas id="prCanvas" width="380" height="200" style="width:100%;max-width:380px"></canvas>
+  </div>
+
+  <!-- Per-class metrics table -->
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+      &#9632; Per-Class Metrics
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Class</th>
+          <th>Precision</th>
+          <th>Recall</th>
+          <th>F1</th>
+          <th>Support</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cls in cm_data.classes %}
+        {% set m = cm_data.metrics[cls] %}
+        <tr>
+          <td>{{ cls }}</td>
+          <td>
+            <span style="color:{% if m.precision >= 80 %}var(--safe){% elif m.precision >= 50 %}var(--warn){% else %}var(--danger){% endif %}">
+              {{ m.precision }}%
+            </span>
+          </td>
+          <td>
+            <span style="color:{% if m.recall >= 80 %}var(--safe){% elif m.recall >= 50 %}var(--warn){% else %}var(--danger){% endif %}">
+              {{ m.recall }}%
+            </span>
+          </td>
+          <td>
+            <span style="color:{% if m.f1 >= 80 %}var(--safe){% elif m.f1 >= 50 %}var(--warn){% else %}var(--danger){% endif %}">
+              {{ m.f1 }}%
+            </span>
+          </td>
+          <td class="hash-cell">{{ m.support }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:14px;padding:10px;background:rgba(0,136,255,.06);border:1px solid rgba(0,136,255,.2);border-radius:6px;font-size:11px;color:var(--text)">
+      <strong style="color:var(--accent)">Overall Accuracy:</strong> {{ cm_data.accuracy }}%
+      &nbsp;|&nbsp;
+      <strong style="color:var(--accent)">Total Samples:</strong> {{ cm_data.total_samples }}
+    </div>
+  </div>
+</div>
+
+<!-- Per-file CNN predictions -->
+<div class="card">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+    &#9632; Per-File CNN Predictions
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Case</th>
+        <th>CNN Prediction</th>
+        <th>Confidence</th>
+        <th>Entropy</th>
+        <th>Magic Mismatch</th>
+        <th>YARA Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in file_predictions %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td class="hash-cell">{{ item.cid }}</td>
+        <td>
+          <span class="badge {% if item.pred == 'High Risk' or item.pred == 'CRITICAL' %}badge-danger
+                {% elif item.pred == 'Medium Risk' %}badge-warn
+                {% elif item.pred == 'Low Risk' %}badge-info
+                {% else %}badge-safe{% endif %}">
+            {{ item.pred }}
+          </span>
+        </td>
+        <td style="font-family:'Share Tech Mono',monospace;font-size:11px;
+          color:{% if item.conf >= 80 %}var(--safe){% elif item.conf >= 60 %}var(--warn){% else %}var(--danger){% endif %}">
+          {{ item.conf }}%
+        </td>
+        <td class="hash-cell">{{ item.entropy }}</td>
+        <td>
+          {% if item.magic_mismatch %}
+          <span class="badge badge-danger" style="font-size:9px">YES</span>
+          {% else %}
+          <span class="badge badge-safe" style="font-size:9px">NO</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="risk-bar-wrap">
+            <div class="risk-bar-fill" style="width:{{ [item.yara_score * 100, 100]|min }}%;background:{% if item.yara_score > 0.5 %}var(--danger){% elif item.yara_score > 0.2 %}var(--warn){% else %}var(--safe){% endif %}"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const cmData = {{ cm_data_json | safe }};
+const accHistory = {{ acc_history_json | safe }};
+const prMetrics  = {{ pr_metrics_json | safe }};
+const classes    = {{ classes_json | safe }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderConfusionMatrix('cmCanvas', classes, cmData.matrix, { cellSize: 72, offset: 100 });
+  renderAccuracyGraph('accCanvas', accHistory);
+  renderPRChart('prCanvas', prMetrics, classes);
+});
+</script>
+{% endblock %}

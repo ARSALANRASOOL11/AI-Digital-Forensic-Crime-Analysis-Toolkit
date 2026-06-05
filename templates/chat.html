@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}AI Investigator — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>AI Investigator</h1>
+  <p>// NATURAL LANGUAGE FORENSIC ANALYSIS</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start">
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div class="status-dot"></div>
+      <span style="font-size:11px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;color:var(--accent)">AI FORENSIC ANALYST &mdash; ONLINE</span>
+    </div>
+    <div class="chat-box">
+      <div class="chat-messages" id="chatMsgs">
+        <div class="chat-msg ai">
+          <div class="ai-label">&#129302; AI ANALYST</div>
+          Hello. I am your AI Forensic Analyst with full access to your evidence database.
+          Ask me anything about your cases, tampered files, risk scores, or what to investigate first.
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInput" placeholder="Ask about your evidence…" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn btn-primary btn-sm" onclick="sendChat()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Sample Questions</div>
+    <div id="sqDiv" style="display:flex;flex-direction:column;gap:7px"></div>
+    <div style="margin-top:18px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace">
+      &#9679; Reads your live evidence database<br>
+      &#9679; Rule-based forensic analysis engine<br>
+      &#9679; Detects tampering, risk, crime type
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+initSampleQuestions([
+  "Which files are tampered?",
+  "Show me all HIGH RISK files",
+  "How many cases do we have?",
+  "Which file has the highest risk score?",
+  "Summarize all evidence",
+  "Are there any executable files?",
+  "Which case should I investigate first?",
+  "List all clean files"
+]);
+</script>
+{% endblock %}

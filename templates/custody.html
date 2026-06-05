@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Chain of Custody — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Chain of Custody</h1>
+  <p>// EVIDENCE ACCESS &amp; HANDLING LOG</p>
+</div>
+
+<div class="card" style="margin-bottom:16px;padding:11px 16px">
+  <p style="font-size:12px;color:var(--muted);font-family:'Share Tech Mono',monospace">
+    &#9679; Every upload, note, and access is recorded below{% if cid %} for <strong style="color:var(--accent)">{{ cid }}</strong>{% endif %}.<br>
+    &#9679; <a href="{{ url_for('custody') }}" style="color:var(--accent)">View all cases</a>
+  </p>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  <table>
+    <tr><th>Case ID</th><th>File</th><th>Action</th><th>Actor</th><th>Timestamp</th><th>Detail</th></tr>
+    {% if not rows %}
+    <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">No custody events yet.</td></tr>
+    {% endif %}
+    {% for rcid, fname, action, actor, ts, detail in rows %}
+    {% set ts_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts|float)) if ts else '' %}
+    {% if action == 'UPLOAD' %}{% set bcls = 'badge-safe' %}
+    {% elif action == 'TAMPER' %}{% set bcls = 'badge-danger' %}
+    {% elif action == 'NOTE_ADDED' %}{% set bcls = 'badge-info' %}
+    {% elif action == 'EXPORT' %}{% set bcls = 'badge-info' %}
+    {% else %}{% set bcls = 'badge-warn' %}{% endif %}
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent)">{{ rcid }}</td>
+      <td>{{ fname }}</td>
+      <td><span class="badge {{ bcls }}">{{ action }}</span></td>
+      <td>{{ actor }}</td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">{{ ts_str }}</td>
+      <td style="font-size:11px;color:var(--muted)">{{ detail[:60] }}{% if detail|length > 60 %}…{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

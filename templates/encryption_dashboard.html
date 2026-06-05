@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Encryption Status{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Evidence Encryption Dashboard</h1>
+  <p>// FERNET AES-128-CBC + HMAC-SHA256 · INTEGRITY VERIFICATION · AUDIT TRAIL</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ stats.total_evidence }}</div><div class="stat-label">Total Evidence</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--safe)">{{ stats.encrypted }}</div><div class="stat-label">Encrypted</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ stats.unencrypted }}</div><div class="stat-label">Unencrypted</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ stats.pct_encrypted }}%</div><div class="stat-label">Coverage</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">{{ stats.decrypt_count }}</div><div class="stat-label">Decryptions</div></div>
+</div>
+
+<!-- Coverage bar -->
+<div class="card" style="margin-bottom:18px;padding:14px 18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:8px">ENCRYPTION COVERAGE</div>
+  <div style="background:rgba(255,255,255,.05);border-radius:6px;height:12px;overflow:hidden">
+    <div style="width:{{ stats.pct_encrypted }}%;height:12px;background:linear-gradient(90deg,var(--safe),var(--accent));transition:width .5s"></div>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-top:6px">{{ stats.encrypted }} of {{ stats.total_evidence }} evidence files encrypted</div>
+</div>
+
+<!-- Actions -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Encrypt / Decrypt Evidence</div>
+    <div class="form-group">
+      <label class="form-label">Select Evidence File</label>
+      <select class="form-input" id="evSelect">
+        {% for r in ev_rows %}
+        <option value="{{ r[0] }}" data-enc="{{ r[4] or '0' }}">{{ r[1] }} — {{ r[2] }} {% if r[4]=='1' %}[🔒 ENC]{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password (optional)</label>
+      <input class="form-input" type="password" id="encPwd" placeholder="Leave blank for master key">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="encryptEv()" style="flex:1;justify-content:center">🔒 ENCRYPT</button>
+      <button class="btn btn-outline" onclick="decryptEv()" style="flex:1;justify-content:center">🔓 DECRYPT</button>
+    </div>
+    <div id="encResult" style="margin-top:10px;font-size:12px"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Batch Operations</div>
+    <p style="font-size:12px;color:var(--text);line-height:1.7;margin-bottom:14px">
+      Encrypt all unencrypted evidence files at once using the master key.
+      Each file gets integrity-verified with SHA-256 before encryption.
+    </p>
+    <button class="btn btn-warn" onclick="batchEncrypt()" style="width:100%;justify-content:center;background:transparent;border:1px solid var(--warn);color:var(--warn)">
+      🔒 ENCRYPT ALL UNENCRYPTED FILES
+    </button>
+    <div id="batchResult" style="margin-top:10px;font-size:12px"></div>
+    <div style="margin-top:14px;padding:10px;background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.2);border-radius:6px;font-size:11px;color:var(--warn)">
+      ⚠ Master key stored at: <code style="background:var(--panel);padding:1px 5px;border-radius:3px">keys/.evidence_master.key</code><br>
+      Set <code style="background:var(--panel);padding:1px 5px;border-radius:3px">EVIDENCE_MASTER_KEY</code> env var for production.
+    </div>
+  </div>
+</div>
+
+<!-- Evidence list with encryption status -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Evidence Encryption Status</div>
+  <table>
+    <tr><th>Case</th><th>File</th><th>Status</th><th>Actions</th></tr>
+    {% for r in ev_rows %}
+    <tr>
+      <td class="hash-cell">{{ r[1] }}</td>
+      <td style="font-size:12px">{{ r[2] }}</td>
+      <td>
+        {% if r[4] == '1' %}
+        <span class="badge badge-safe">🔒 Encrypted</span>
+        {% else %}
+        <span class="badge badge-warn">🔓 Plaintext</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if r[4] != '1' %}
+        <button onclick="quickEncrypt('{{ r[0] }}')" class="btn btn-ghost btn-sm" style="font-size:10px">🔒 Encrypt</button>
+        {% else %}
+        <button onclick="quickDecrypt('{{ r[0] }}')" class="btn btn-ghost btn-sm" style="font-size:10px">🔓 Decrypt</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- Audit log -->
+{% if logs %}
+<div class="card">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">ENCRYPTION AUDIT LOG ({{ logs|length }})</div>
+  <table>
+    <tr><th>Action</th><th>File</th><th>Case</th><th>Actor</th><th>Time</th><th>Status</th></tr>
+    {% for log in logs[:50] %}
+    {% set ts = log[4]|float if log[4] else 0 %}
+    <tr>
+      <td>
+        <span class="badge {% if 'ENCRYPT' in (log[2] or '') %}badge-safe{% elif 'DECRYPT' in (log[2] or '') %}badge-info{% else %}badge-warn{% endif %}" style="font-size:9px">
+          {{ log[2] or '' }}
+        </span>
+      </td>
+      <td style="font-size:11px">{{ log['filename'] if log['filename'] else '—' }}</td>
+      <td class="hash-cell">{{ log['case_id'] if log['case_id'] else '—' }}</td>
+      <td style="font-size:11px">{{ log[3] or '' }}</td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">
+        {% if ts %}{{ ts|int|string[:10] }}{% endif %}
+      </td>
+      <td>
+        {% if log[7] == 1 %}<span style="color:var(--safe);font-size:11px">✔</span>
+        {% else %}<span style="color:var(--danger);font-size:11px">✘</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function encryptEv() {
+  const id  = document.getElementById('evSelect').value;
+  const pwd = document.getElementById('encPwd').value;
+  const fd  = new FormData();
+  fd.append('ev_id', id); fd.append('password', pwd);
+  const r   = await fetch('/api/encrypt_evidence', {method:'POST', body:fd, headers:{'X-CSRF-Token':getCsrfToken()}});
+  const d   = await r.json();
+  const div = document.getElementById('encResult');
+  div.innerHTML = d.success
+    ? `<span style="color:var(--safe)">✔ Encrypted successfully · ${d.algorithm?.slice(0,30)||''}</span>`
+    : `<span style="color:var(--danger)">✘ ${d.error}</span>`;
+  if (d.success) setTimeout(()=>location.reload(), 1500);
+}
+
+async function decryptEv() {
+  const id  = document.getElementById('evSelect').value;
+  const pwd = document.getElementById('encPwd').value;
+  const fd  = new FormData();
+  fd.append('ev_id', id); fd.append('password', pwd);
+  const r   = await fetch('/api/decrypt_evidence', {method:'POST', body:fd, headers:{'X-CSRF-Token':getCsrfToken()}});
+  const d   = await r.json();
+  const div = document.getElementById('encResult');
+  if (d.tampered) {
+    div.innerHTML = `<span style="color:var(--danger)">⚠ TAMPER DETECTED — file integrity compromised</span>`;
+  } else {
+    div.innerHTML = d.success
+      ? `<span style="color:var(--safe)">✔ Decrypted · Integrity: ${d.integrity}</span>`
+      : `<span style="color:var(--danger)">✘ ${d.error}</span>`;
+  }
+  if (d.success) setTimeout(()=>location.reload(), 1500);
+}
+
+async function batchEncrypt() {
+  if (!confirm('Encrypt all unencrypted evidence files using master key?')) return;
+  const fd = new FormData();
+  const r  = await fetch('/api/batch_encrypt', {method:'POST', body:fd, headers:{'X-CSRF-Token':getCsrfToken()}});
+  const d  = await r.json();
+  document.getElementById('batchResult').innerHTML =
+    `<span style="color:var(--safe)">✔ Encrypted ${d.encrypted} file(s)</span>` +
+    (d.errors?.length ? `<br><span style="color:var(--warn)">${d.errors.length} error(s)</span>` : '');
+  setTimeout(()=>location.reload(), 2000);
+}
+
+function quickEncrypt(id) {
+  document.getElementById('evSelect').value = id;
+  encryptEv();
+}
+
+function quickDecrypt(id) {
+  document.getElementById('evSelect').value = id;
+  decryptEv();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>MFA Verify — Forensic Toolkit</title><link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}"></head><body>
+<div class="login-wrap"><div class="login-box scanline-container">
+  <div class="login-icon">🔐</div>
+  <div class="login-title">MFA Required</div>
+  <div class="login-sub">ENTER CODE FROM AUTHENTICATOR APP</div>
+  <div class="scanner-bar"></div>
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label class="form-label">6-Digit Authenticator Code</label>
+      <input class="form-input" name="totp_code" placeholder="000000" maxlength="6" autofocus style="font-size:24px;letter-spacing:8px;text-align:center">
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;padding:11px">VERIFY →</button>
+  </form>
+  <details style="margin-top:18px"><summary style="font-size:11px;color:var(--muted);cursor:pointer;font-family:'Share Tech Mono',monospace">Use backup code instead</summary>
+  <form method="POST" style="margin-top:10px">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input class="form-input" name="backup_code" placeholder="XXXXXXXX-XXXXXXXX" style="font-family:'Share Tech Mono',monospace;margin-bottom:8px">
+    <button class="btn btn-ghost" type="submit" style="width:100%;justify-content:center">USE BACKUP CODE</button>
+  </form></details>
+</div></div></body></html>

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}TI Correlation Center{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Threat Intelligence Correlation Center</h1>
+  <p>// VIRUSTOTAL · ABUSEIPDB · OTX · URLHAUS · MALWAREBAZAAR · THREATFOX · UNIFIED DASHBOARD</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ result.summary.total_evidence }}</div><div class="stat-label">Files Checked</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.summary.flagged }}</div><div class="stat-label">Flagged</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ result.summary.families_found }}</div><div class="stat-label">Malware Families</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ result.summary.shared_iocs }}</div><div class="stat-label">Shared IOCs</div></div>
+  <div class="stat-card"><div class="stat-value">{{ result.total_lookups }}</div><div class="stat-label">TI Lookups</div></div>
+</div>
+
+<!-- Source status -->
+<div class="card" style="margin-bottom:18px;padding:12px 18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">API Source Status</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for src, active in result.sources_status.items() %}
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;font-size:10px;font-family:'Share Tech Mono',monospace">
+      <div style="width:7px;height:7px;border-radius:50%;background:{% if active %}var(--safe){% else %}var(--muted){% endif %}"></div>
+      <span style="color:{% if active %}var(--text){% else %}var(--muted){% endif %}">{{ src.upper() }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Malware families -->
+{% if result.threat_families %}
+<div class="card" style="margin-bottom:14px;border-color:rgba(255,60,60,.3)">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:10px">⚠ MALWARE FAMILIES DETECTED</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for family, count in result.threat_families %}
+    <div style="padding:5px 12px;background:rgba(255,60,60,.1);border:1px solid rgba(255,60,60,.3);border-radius:20px;font-size:11px;color:var(--danger);font-family:'Share Tech Mono',monospace">
+      {{ family }} ×{{ count }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Per-file TI results -->
+<div class="card">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Per-File Intelligence Results</div>
+  <table>
+    <tr><th>File</th><th>Case</th><th>Severity</th><th>Families</th><th>Lookups</th><th>Alerts</th></tr>
+    {% for ev in result.evidence_results %}
+    {% set sc = 'badge-danger' if ev.severity in ('CRITICAL','HIGH') else 'badge-warn' if ev.severity=='MEDIUM' else 'badge-safe' %}
+    <tr {% if ev.severity in ('CRITICAL','HIGH') %}style="background:rgba(255,60,60,.04)"{% endif %}>
+      <td style="font-size:12px">{{ ev.filename[:35] }}</td>
+      <td class="hash-cell">{{ ev.case_id }}</td>
+      <td><span class="badge {{ sc }}">{{ ev.severity }}</span></td>
+      <td style="font-size:11px;color:var(--warn)">{{ ev.families[:2]|join(', ') or '—' }}</td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:11px">{{ ev.lookups|length }}</td>
+      <td style="font-size:11px;color:var(--danger)">
+        {% if ev.alerts %}{{ ev.alerts[0][:50] }}{% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

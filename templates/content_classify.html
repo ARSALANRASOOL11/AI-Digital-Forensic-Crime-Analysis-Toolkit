@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Content Classification{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Content-Based Crime Classification</h1><p>// ML + PATTERN ENGINE · 15 CRIME CATEGORIES · TF-IDF + MLP ENSEMBLE</p></div>
+<div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Select Evidence File</div>
+    <form method="POST" id="ccForm">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% for r in ev_rows %}
+      <div class="card" style="padding:10px 14px;margin-bottom:7px;cursor:pointer;" onclick="document.getElementById('evId').value='{{r[0]}}';document.getElementById('ccForm').submit()">
+        <div style="font-size:12px;color:#fff">{{r[2]}}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{r[1]}}</div>
+      </div>
+      {% else %}<p style="color:var(--muted);font-size:13px">No evidence uploaded.</p>{% endfor %}
+      <input type="hidden" name="ev_id" id="evId">
+    </form>
+  </div>
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🧠</div>
+      <p>Select a file to classify its crime type using content analysis and ML.</p>
+    </div>
+    {% else %}
+    {% set conf = result.confidence %}
+    {% set sc = 'var(--danger)' if conf>=70 else 'var(--warn)' if conf>=40 else 'var(--safe)' %}
+    <div class="card" style="border-color:{{sc}};margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:60px;height:60px;border-radius:50%;background:rgba(0,0,0,.3);border:2px solid {{sc}};display:flex;align-items:center;justify-content:center;font-size:26px">🧠</div>
+        <div>
+          <div style="font-size:18px;font-weight:800;color:{{sc}};letter-spacing:1px">{{result.predicted_crime}}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">{{result.filename}} · {{result.case_id}}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:28px;font-weight:800;color:{{sc}};font-family:'Share Tech Mono',monospace">{{result.confidence|round(0)|int}}%</div>
+          <div style="font-size:10px;color:var(--muted)">CONFIDENCE</div>
+        </div>
+      </div>
+    </div>
+    <!-- Evidence explanation -->
+    {% if result.evidence %}
+    <div class="card" style="margin-bottom:14px;border-color:rgba(255,184,0,.3)">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--warn);font-family:'Share Tech Mono',monospace;margin-bottom:10px">⚠ WHY THIS CLASSIFICATION</div>
+      {% for e in result.evidence[:6] %}<div style="font-size:12px;color:var(--text);padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">● Pattern match: <code style="background:var(--panel);padding:1px 6px;border-radius:3px;font-family:'Share Tech Mono',monospace">{{e[:80]}}</code></div>{% endfor %}
+      {% if result.structural.entropy > 7.0 %}<div style="font-size:12px;color:var(--warn);padding:5px 0">● High byte entropy ({{result.structural.entropy|round(2)}}/8.0) — encrypted/packed content</div>{% endif %}
+      {% if result.structural.has_mz %}<div style="font-size:12px;color:var(--text);padding:5px 0">● Windows PE executable header detected</div>{% endif %}
+      {% if result.structural.has_bitcoin %}<div style="font-size:12px;color:var(--danger);padding:5px 0">● Cryptocurrency wallet address found</div>{% endif %}
+    </div>
+    {% endif %}
+    <!-- Top 3 predictions -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Top 3 Crime Predictions</div>
+      {% for item in result.top3 %}
+      {% set sc2 = result.all_scores.get(item.crime, item.get('score',0)) %}
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:{% if loop.first %}700{% else %}400{% endif %};color:{% if loop.first %}#fff{% else %}var(--muted){% endif %};flex:1">{{item.crime}}</div>
+        <div style="width:200px;background:rgba(255,255,255,.05);border-radius:4px;height:8px">
+          <div style="width:{{[sc2,100]|min}}%;height:8px;border-radius:4px;background:{% if loop.first %}var(--danger){% elif loop.index==2 %}var(--warn){% else %}var(--accent2){% endif %}"></div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);min-width:40px;text-align:right">{{sc2|round(0)|int}}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- ML vs Pattern -->
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Classifier Details</div>
+      <table class="meta-table">
+        <tr><td>ML Prediction (TF-IDF + MLP)</td><td style="color:var(--accent)">{{result.ml_prediction}} ({{result.ml_confidence}}%)</td></tr>
+        <tr><td>Pattern Match</td><td style="color:var(--accent)">{{result.pat_prediction}} ({{result.pat_confidence|round(0)|int}}%)</td></tr>
+        <tr><td>Method</td><td>{{result.method}}</td></tr>
+        <tr><td>Entropy</td><td style="color:{% if result.structural.entropy>7.2 %}var(--danger){% else %}var(--safe){% endif %}">{{result.structural.entropy|round(3)}}/8.0</td></tr>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

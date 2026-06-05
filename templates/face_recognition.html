@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Face Recognition{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Face Recognition</h1>
+  <p>// SUSPECT IDENTIFICATION · FACE MATCHING · CROSS-EVIDENCE SEARCH</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ stats.total_faces }}</div><div class="stat-label">Faces Detected</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ stats.total_persons }}</div><div class="stat-label">Persons</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ stats.unidentified }}</div><div class="stat-label">Unidentified</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--safe)">{{ stats.confirmed }}</div><div class="stat-label">Confirmed Matches</div></div>
+  <div class="stat-card"><div class="stat-value" style="font-size:11px;color:var(--accent2)">{{ stats.backend[:12] }}</div><div class="stat-label">Engine</div></div>
+</div>
+
+{% if result %}
+<div class="alert {% if result.faces_detected > 0 %}alert-success{% else %}alert-warn{% endif %}" style="margin-bottom:18px">
+  {% if result.action == 'scan' %}
+    ✔ Scanned evidence — {{ result.faces_detected }} face(s) detected, {{ result.new_faces }} new, {{ result.matches|length }} match(es)
+  {% elif result.action == 'label' %}
+    ✔ Face {{ result.face_id[:12] }}… labelled as <strong>{{ result.name }}</strong>
+  {% elif result.action == 'scan_all' %}
+    ✔ Scanned all image evidence — {{ result.total_faces }} total faces found
+  {% endif %}
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start">
+
+  <!-- Controls -->
+  <div>
+    <!-- Scan evidence -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Scan Evidence for Faces</div>
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="scan_evidence">
+        <select class="form-input" name="ev_id" style="margin-bottom:10px">
+          <option value="">Select image evidence...</option>
+          {% for r in ev_rows %}<option value="{{ r[0] }}">{{ r[1] }} — {{ r[2] }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">👤 SCAN FOR FACES</button>
+      </form>
+    </div>
+
+    <!-- Face search -->
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Suspect Search</div>
+      <div class="file-drop" onclick="document.getElementById('fsImg').click()" style="padding:16px">
+        <div style="font-size:24px;margin-bottom:6px">🔍</div>
+        <p style="font-size:11px">Upload face photo to search</p>
+        <p id="fsName" style="color:var(--accent);font-size:10px;margin-top:4px;font-family:'Share Tech Mono',monospace"></p>
+        <input type="file" id="fsImg" style="display:none" accept="image/*" onchange="document.getElementById('fsName').textContent=this.files[0]?.name||''">
+      </div>
+      <button class="btn btn-outline" onclick="searchFace()" style="width:100%;justify-content:center;margin-top:10px">🔍 SEARCH DATABASE</button>
+      <div id="searchResult" style="margin-top:10px;font-size:12px;color:var(--text)"></div>
+    </div>
+
+    <!-- Scan all -->
+    <div class="card">
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="scan_all">
+        <button class="btn btn-ghost" type="submit" style="width:100%;justify-content:center;font-size:11px">📸 SCAN ALL IMAGE EVIDENCE</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Face database -->
+  <div>
+    {% if faces %}
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">FACE DATABASE ({{ faces|length }})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
+        {% for face in faces[:24] %}
+        <div class="card" style="padding:10px;text-align:center;margin:0">
+          {% if face.face_b64 %}
+          <img src="data:image/jpeg;base64,{{ face.face_b64 }}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid {% if face.person_name %}var(--safe){% else %}var(--muted){% endif %};display:block;margin:0 auto 8px">
+          {% else %}
+          <div style="width:80px;height:80px;border-radius:50%;background:var(--panel);border:2px solid var(--muted);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px">👤</div>
+          {% endif %}
+          <div style="font-size:11px;color:{% if face.person_name %}var(--safe){% else %}var(--muted){% endif %};font-weight:{% if face.person_name %}700{% else %}400{% endif %}">
+            {{ face.person_name or 'Unknown' }}
+          </div>
+          <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px">{{ face.case_id or '' }}</div>
+          {% if not face.person_name %}
+          <button onclick="labelFace('{{ face.face_id }}')" class="btn btn-ghost btn-sm" style="font-size:9px;padding:2px 8px;margin-top:6px">Label</button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">👤</div>
+      <p>No faces in database yet. Scan image evidence to detect faces.</p>
+    </div>
+    {% endif %}
+
+    <!-- Known persons -->
+    {% if persons %}
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">KNOWN PERSONS ({{ persons|length }})</div>
+      <table><tr><th>ID</th><th>Name</th><th>Alias</th><th>Notes</th></tr>
+        {% for p in persons %}
+        <tr>
+          <td class="hash-cell">{{ p[0] }}</td>
+          <td style="font-weight:600;color:#fff">{{ p[1] }}</td>
+          <td style="color:var(--muted)">{{ p[2] or '—' }}</td>
+          <td style="font-size:11px;color:var(--muted)">{{ (p[3] or '')[:40] }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Label face modal -->
+<div id="labelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:400px;width:100%">
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:18px">Label Face</div>
+    <form method="POST">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="label_face">
+      <input type="hidden" name="face_id" id="labelFaceId">
+      <div class="form-group">
+        <label class="form-label">Person Name</label>
+        <input class="form-input" name="person_name" placeholder="Enter suspect or person name" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input class="form-input" name="notes" placeholder="Optional notes">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" type="submit" style="flex:1;justify-content:center">SAVE</button>
+        <button class="btn btn-ghost" type="button" onclick="closeLabelModal()" style="flex:1;justify-content:center">CANCEL</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function labelFace(faceId) {
+  document.getElementById('labelFaceId').value = faceId;
+  document.getElementById('labelModal').style.display = 'flex';
+}
+function closeLabelModal() {
+  document.getElementById('labelModal').style.display = 'none';
+}
+async function searchFace() {
+  const file = document.getElementById('fsImg').files[0];
+  if (!file) { alert('Select a face image first'); return; }
+  const fd = new FormData();
+  fd.append('face_image', file);
+  const res = await fetch('/face_search', {method:'POST', body:fd, headers:{'X-CSRF-Token': getCsrfToken()}});
+  const data = await res.json();
+  const div = document.getElementById('searchResult');
+  if (!data.found) { div.innerHTML = `<span style="color:var(--muted)">${data.message||'No faces detected'}</span>`; return; }
+  let html = '';
+  for (const f of data.faces) {
+    const col = f.matched ? 'var(--danger)' : 'var(--safe)';
+    html += `<div style="padding:8px;border:1px solid ${col};border-radius:6px;margin-bottom:6px">
+      <span style="color:${col};font-weight:700">${f.matched ? '⚠ MATCH FOUND' : '✔ No match'}</span>
+      ${f.matched ? `<br><span style="font-size:11px;color:var(--text)">Similarity: ${f.match_pct}%</span>` : ''}
+    </div>`;
+  }
+  div.innerHTML = html;
+}
+</script>
+{% endblock %}

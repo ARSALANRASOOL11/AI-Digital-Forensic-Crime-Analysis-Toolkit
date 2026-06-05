@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Threat Intelligence — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Threat Intelligence</h1>
+  <p>// MULTI-SOURCE IOC LOOKUP — VT · ABUSEIPDB · SHODAN · OTX · MALWAREBAZAAR · URLHAUS · THREATFOX · GREYNOISE</p>
+</div>
+
+<!-- Source status -->
+<div class="card" style="margin-bottom:18px;padding:14px 18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">API Source Status</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for src, active in sources.items() %}
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;font-size:10px;font-family:'Share Tech Mono',monospace">
+      <div style="width:7px;height:7px;border-radius:50%;background:{% if active %}var(--safe){% else %}var(--muted){% endif %}"></div>
+      <span style="color:{% if active %}var(--text){% else %}var(--muted){% endif %}">{{ src.upper() }}</span>
+      {% if not active and src not in ('malwarebazaar','urlhaus','threatfox') %}
+      <span style="color:var(--muted);font-size:9px">[no key]</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <p style="font-size:10px;color:var(--muted);margin-top:8px;font-family:'Share Tech Mono',monospace">
+    Set env vars: VIRUSTOTAL_API_KEY · ABUSEIPDB_API_KEY · SHODAN_API_KEY · OTX_API_KEY · GREYNOISE_API_KEY
+  </p>
+</div>
+
+<!-- Lookup form -->
+<div class="card" style="max-width:580px;margin-bottom:24px">
+  <form method="POST">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;margin-bottom:12px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Type</label>
+        <select class="form-input" name="ioc_type" id="iocType">
+          <option value="hash">File Hash (MD5/SHA)</option>
+          <option value="ip">IP Address</option>
+          <option value="url">URL</option>
+          <option value="domain">Domain</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Value</label>
+        <input class="form-input" name="ioc_value" id="iocValue"
+               placeholder="Enter hash, IP, URL, or domain…"
+               value="{{ result.value if result else '' }}">
+      </div>
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">
+      &#128248; QUERY ALL THREAT INTEL SOURCES
+    </button>
+  </form>
+</div>
+
+{% if result %}
+{% set sev = result.severity %}
+{% if sev == 'CRITICAL' %}{% set scls = 'badge-danger' %}{% set sc = 'var(--danger)' %}
+{% elif sev == 'HIGH' %}{% set scls = 'badge-warn' %}{% set sc = 'var(--warn)' %}
+{% elif sev == 'MEDIUM' %}{% set scls = 'badge-info' %}{% set sc = 'var(--accent2)' %}
+{% else %}{% set scls = 'badge-safe' %}{% set sc = 'var(--safe)' %}{% endif %}
+
+<!-- Summary banner -->
+<div class="card" style="border-color:{{ sc }};margin-bottom:18px">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="width:50px;height:50px;border-radius:50%;background:rgba(0,0,0,.3);border:2px solid {{ sc }};display:flex;align-items:center;justify-content:center;font-size:20px">
+      {% if sev == 'CRITICAL' %}&#9888;{% elif sev == 'HIGH' %}&#128308;{% else %}&#10004;{% endif %}
+    </div>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:{{ sc }};text-transform:uppercase;letter-spacing:2px">{{ sev }} THREAT</div>
+      <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px">
+        {{ result.value[:80] }} &bull; {{ result.ioc_type|upper }}
+      </div>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div style="font-size:24px;font-weight:800;color:{{ sc }};font-family:'Share Tech Mono',monospace">{{ result.sources_hit }}/{{ result.sources_checked }}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Sources Hit</div>
+    </div>
+  </div>
+</div>
+
+{% if result.alerts %}
+<div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">&#9888; THREAT ALERTS</div>
+  {% for alert in result.alerts %}
+  <div style="font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">&#9679; {{ alert }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Per-source results -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
+  {% for src_name, src_data in result.results.items() %}
+  {% if src_data %}
+  {% set has_key = not src_data.get('_no_key') %}
+  {% set has_err = src_data.get('_error') %}
+  {% set src_sev = src_data.get('severity','LOW') %}
+  {% if src_sev == 'CRITICAL' %}{% set bcls='badge-danger' %}
+  {% elif src_sev == 'HIGH' %}{% set bcls='badge-warn' %}
+  {% elif src_sev == 'MEDIUM' %}{% set bcls='badge-info' %}
+  {% else %}{% set bcls='badge-safe' %}{% endif %}
+  <div class="card" style="padding:14px;{% if not has_key %}opacity:.5{% endif %}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+      <span class="badge badge-info">{{ src_name|upper }}</span>
+      {% if has_key and not has_err %}
+      <span class="badge {{ bcls }}" style="font-size:9px;margin-left:auto">{{ src_sev }}</span>
+      {% elif not has_key %}
+      <span style="font-size:10px;color:var(--muted);margin-left:auto;font-family:'Share Tech Mono',monospace">NO API KEY</span>
+      {% else %}
+      <span style="font-size:10px;color:var(--danger);margin-left:auto;font-family:'Share Tech Mono',monospace">ERROR</span>
+      {% endif %}
+    </div>
+    {% if not has_key %}
+    <p style="font-size:11px;color:var(--muted)">{{ src_data.message }}</p>
+    {% elif has_err %}
+    <p style="font-size:11px;color:var(--danger)">{{ src_data.message[:100] }}</p>
+    {% else %}
+    <table class="meta-table">
+      {% for k, v in src_data.items() %}
+      {% if k not in ('source','_error','_no_key','severity','found','detections','results','urls','banners') and v %}
+      <tr>
+        <td>{{ k.replace('_',' ').title() }}</td>
+        <td>
+          {% if v is iterable and v is not string %}
+            {{ v[:5]|join(', ') if v else '—' }}
+          {% else %}
+            {{ v|string|truncate(80) }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    {% if src_data.get('detections') %}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:5px">DETECTIONS</div>
+      {% for det in src_data.detections[:5] %}
+      <div style="font-size:11px;color:var(--danger);margin-bottom:2px">&#9679; {{ det.engine }}: {{ det.result }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if src_data.get('permalink') %}
+    <a href="{{ src_data.permalink }}" target="_blank" style="display:inline-block;margin-top:8px;font-size:10px;color:var(--accent);font-family:'Share Tech Mono',monospace;text-decoration:none">
+      VIEW ON {{ src_name|upper }} &#8599;
+    </a>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

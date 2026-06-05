@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Memory Forensics — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Memory Forensics</h1>
+  <p>// VOLATILITY ENGINE — PROCESS / NETWORK / MALWARE MEMORY ANALYSIS</p>
+</div>
+
+<!-- Engine status -->
+<div class="card" style="padding:12px 18px;margin-bottom:18px;border-color:{% if vol3_available %}rgba(0,255,136,.3){% else %}rgba(0,136,255,.3){% endif %}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="status-dot" style="background:{% if vol3_available %}var(--safe){% else %}var(--accent2){% endif %}"></div>
+    <span style="font-size:11px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;color:{% if vol3_available %}var(--safe){% else %}var(--accent2){% endif %}">
+      ENGINE: {% if vol3_available %}VOLATILITY3 INSTALLED — FULL PLUGIN SUPPORT{% else %}BUILT-IN PARSER ACTIVE — INSTALL volatility3 FOR FULL SUPPORT{% endif %}
+    </span>
+    {% if not vol3_available %}
+    <span style="font-size:10px;color:var(--muted);margin-left:auto;font-family:'Share Tech Mono',monospace">pip install volatility3</span>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start">
+
+  <!-- Upload + Options -->
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">
+      Upload Memory Image
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Memory File</label>
+        <div class="file-drop" onclick="document.getElementById('mf').click()" style="padding:18px">
+          <div style="font-size:24px;margin-bottom:6px">&#128190;</div>
+          <p style="font-size:11px">Supported: {{ supported_formats|join(' ') }}</p>
+          <p id="mfn" style="color:var(--accent);font-size:11px;font-family:'Share Tech Mono',monospace;margin-top:5px"></p>
+          <input type="file" id="mf" name="memfile" style="display:none" onchange="document.getElementById('mfn').textContent=this.files[0]?.name||''">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Plugin</label>
+        <select class="form-input" name="plugin" id="pluginSel">
+          {% for p in plugins %}
+          <option value="{{ p }}" {% if p == plugin %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Profile (Volatility2 only, optional)</label>
+        <input class="form-input" name="profile" placeholder="e.g. Win7SP1x64">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-primary" type="submit" style="flex:1;justify-content:center">&#9654; Run Plugin</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:9px;background:rgba(0,255,231,.04);border:1px solid var(--border);border-radius:5px">
+        <input type="checkbox" name="run_all" value="1" id="runAll" style="accent-color:var(--accent)">
+        <label for="runAll" style="font-size:11px;color:var(--text);cursor:pointer">Run ALL plugins (full analysis)</label>
+      </div>
+    </form>
+
+    <div style="margin-top:18px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px">
+      <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:8px">PLUGINS</div>
+      {% for p in plugins %}
+      <div style="font-size:11px;color:var(--text);margin-bottom:3px;font-family:'Share Tech Mono',monospace">
+        <span style="color:var(--accent)">&#9679;</span> {{ p }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">&#128190;</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px">No Memory Image Loaded</div>
+      <p style="font-size:12px">Upload a .mem / .vmem / .dmp / .raw file and select a plugin to begin analysis.</p>
+    </div>
+
+    {% elif result.mode == 'single' %}
+    {% set d = result.data %}
+    <div class="card" style="margin-bottom:14px;padding:12px 18px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="badge badge-info">{{ result.plugin|upper }}</span>
+        <span style="font-size:12px;color:var(--text)">{{ result.file }}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-left:auto">Engine: {{ result.engine }}</span>
+      </div>
+    </div>
+
+    {% if d.alerts %}
+    <div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">&#9888; ALERTS ({{ d.alerts|length }})</div>
+      {% for alert in d.alerts %}
+      <div style="font-size:12px;color:var(--text);margin-bottom:4px">&#9679; {{ alert }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent)">
+        {{ d.summary }}
+      </div>
+      <table>
+        {% if d.rows %}
+        <tr>{% for key in d.rows[0].keys() %}<th>{{ key }}</th>{% endfor %}</tr>
+        {% for row in d.rows[:100] %}
+        <tr>
+          {% for key, val in row.items() %}
+          <td style="{% if val == True %}color:var(--danger){% elif val == False %}color:var(--muted){% endif %}font-size:11px">
+            {% if val == True %}&#10006; YES{% elif val == False %}&#8212;{% else %}{{ val|string|truncate(60) }}{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr><td style="text-align:center;padding:20px;color:var(--muted)">No results from this plugin.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+
+    {% elif result.mode == 'full' %}
+    <!-- Full analysis results -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" style="color:{% if result.threat_score >= 70 %}var(--danger){% elif result.threat_score >= 30 %}var(--warn){% else %}var(--safe){% endif %}">{{ result.threat_score }}</div><div class="stat-label">Threat Score</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.alerts|length }}</div><div class="stat-label">Alerts</div></div>
+      <div class="stat-card"><div class="stat-value">{{ result.size_mb }}</div><div class="stat-label">Image MB</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">{{ result.plugins|length }}</div><div class="stat-label">Plugins Run</div></div>
+    </div>
+
+    {% if result.alerts %}
+    <div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">&#9888; ALL ALERTS ({{ result.alerts|length }})</div>
+      {% for alert in result.alerts[:20] %}
+      <div style="font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">&#9679; {{ alert }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for pname, pdata in result.plugins.items() %}
+    {% if pdata.rows %}
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span class="badge badge-info">{{ pname|upper }}</span>
+        <span style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{ pdata.summary }}</span>
+        {% if pdata.alerts %}<span class="badge badge-danger" style="font-size:9px;margin-left:auto">{{ pdata.alerts|length }} alerts</span>{% endif %}
+      </div>
+      <table>
+        {% if pdata.rows %}
+        <tr>{% for key in pdata.rows[0].keys() %}<th>{{ key }}</th>{% endfor %}</tr>
+        {% for row in pdata.rows[:15] %}
+        <tr>{% for k, v in row.items() %}
+          <td style="font-size:11px;{% if v == True %}color:var(--danger){% elif v == False %}color:var(--muted){% endif %}">
+            {% if v == True %}&#10006; YES{% elif v == False %}&#8212;{% else %}{{ v|string|truncate(50) }}{% endif %}
+          </td>
+        {% endfor %}</tr>
+        {% endfor %}
+        {% endif %}
+      </table>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

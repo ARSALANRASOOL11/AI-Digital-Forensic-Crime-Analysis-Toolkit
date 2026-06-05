@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Autopsy Timeline — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Autopsy Timeline</h1>
+  <p>// DIGITAL FORENSIC ARTIFACT VIEWER &mdash; CHRONOLOGICAL EVENT RECONSTRUCTION</p>
+</div>
+
+<div class="card" style="margin-bottom:18px;padding:14px 18px">
+  <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">AUTOPSY INTEGRATION NOTE</div>
+  <p style="font-size:12px;color:var(--text);line-height:1.7">
+    This timeline reconstructs forensic events from the evidence database, simulating Autopsy's artifact viewer.
+    In a real workflow, Autopsy exports an artifact CSV which this system reads alongside upload and integrity events.
+  </p>
+</div>
+
+{% set total_ev = events|length %}
+{% set tamper_ev = events|selectattr('event_type','eq','TAMPER_DETECTED')|list|length %}
+{% set high_risk = events|selectattr('risk_level','eq','HIGH_RISK')|list|length %}
+{% set clean_ev = events|selectattr('risk_level','eq','CLEAN')|list|length %}
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ total_ev }}</div><div class="stat-label">Total Events</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ tamper_ev }}</div><div class="stat-label">Tamper Events</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ high_risk }}</div><div class="stat-label">High Risk</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--safe)">{{ clean_ev }}</div><div class="stat-label">Clean</div></div>
+</div>
+
+{% if not events %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+  <div style="font-size:36px;margin-bottom:12px">&#128337;</div>
+  No events yet. Upload evidence files to generate the timeline.
+</div>
+{% else %}
+<div class="card">
+  <div class="timeline">
+    {% for ev in events %}
+    {% if ev.event_type == 'TAMPER_DETECTED' %}
+      {% set dot_color = 'var(--danger)' %}{% set badge_cls = 'badge-danger' %}{% set icon = '✘' %}
+    {% else %}
+      {% set dot_color = 'var(--accent)' %}{% set badge_cls = 'badge-info' %}{% set icon = '↑' %}
+    {% endif %}
+    {% if ev.risk_level == 'HIGH_RISK' %}{% set rbcls = 'badge-danger' %}
+    {% elif ev.risk_level in ('MEDIUM_RISK','LOW_RISK') %}{% set rbcls = 'badge-warn' %}
+    {% else %}{% set rbcls = 'badge-safe' %}{% endif %}
+    <div class="tl-item">
+      <div class="tl-dot" style="background:{{ dot_color }};box-shadow:0 0 8px {{ dot_color }}"></div>
+      <div class="tl-time">{{ ev.time }}</div>
+      <div class="tl-content">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          {{ icon }}
+          <span style="font-weight:700;font-size:13px;color:#fff">{{ ev.filename }}</span>
+          <span class="badge {{ badge_cls }}" style="font-size:9px">{{ ev.event_type.replace('_',' ') }}</span>
+          <span class="badge {{ rbcls }}" style="font-size:9px">{{ ev.risk_level.replace('_',' ') }} &bull; {{ ev.risk_score }}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace">
+          {{ ev.case_id }} &bull; Integrity: {{ ev.integrity }}
+        </div>
+        {% if ev.detail %}
+        <div style="font-size:11px;color:var(--text);margin-top:4px">{{ ev.detail }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

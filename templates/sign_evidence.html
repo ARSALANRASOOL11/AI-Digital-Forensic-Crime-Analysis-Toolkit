@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Sign Evidence{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Digital Evidence Signing</h1>
+  <p>// RSA-2048 · PSS PADDING · SHA-256 · COURT-ADMISSIBLE SIGNATURES</p>
+</div>
+
+<div style="display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start">
+  <div>
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Sign / Verify Evidence</div>
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label">Evidence File</label>
+          <select class="form-input" name="ev_id">
+            {% for r in ev_rows %}
+            <option value="{{ r[0] }}">{{ r[1] }} — {{ r[2] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" name="action" value="sign" type="submit" style="flex:1;justify-content:center">✍ SIGN</button>
+          <button class="btn btn-outline" name="action" value="verify" type="submit" style="flex:1;justify-content:center">✔ VERIFY</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:10px">PUBLIC KEY (RSA-2048)</div>
+      <textarea style="width:100%;height:120px;background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted)" readonly>{{ pubkey }}</textarea>
+      <p style="font-size:10px;color:var(--muted);margin-top:6px">Share this public key with courts or third parties for signature verification.</p>
+    </div>
+  </div>
+
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">✍</div>
+      <p>Select an evidence file and click Sign to apply a cryptographic RSA signature.</p>
+      <p style="font-size:11px;margin-top:10px">Signatures prove the file has not been modified since signing — admissible in court.</p>
+    </div>
+    {% else %}
+
+    {% if result.action == 'sign' %}
+    {% if result.success %}
+    <div class="alert alert-success">✔ Evidence signed successfully with RSA-PSS / SHA-256</div>
+    <div class="card" style="border-color:rgba(0,255,136,.3)">
+      <table class="meta-table">
+        <tr><td>File</td><td>{{ result.filename }}</td></tr>
+        <tr><td>Case</td><td>{{ result.case_id }}</td></tr>
+        <tr><td>Examiner</td><td>{{ result.examiner }}</td></tr>
+        <tr><td>Signed At</td><td>{{ result.signed_at }}</td></tr>
+        <tr><td>Algorithm</td><td>{{ result.algorithm }}</td></tr>
+        <tr><td>SHA-256</td><td style="word-break:break-all;font-family:'Share Tech Mono',monospace;font-size:10px">{{ result.sha256 }}</td></tr>
+      </table>
+      <div style="margin-top:14px">
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:5px">RSA SIGNATURE (BASE64)</div>
+        <textarea style="width:100%;height:80px;background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--safe)" readonly>{{ result.signature }}</textarea>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-error">✘ {{ result.error }}</div>
+    {% endif %}
+
+    {% elif result.action == 'verify' %}
+    <div class="card" style="border-color:{% if result.valid %}rgba(0,255,136,.3){% else %}rgba(255,60,60,.3){% endif %}">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div style="width:50px;height:50px;border-radius:50%;background:{% if result.valid %}rgba(0,255,136,.12){% else %}rgba(255,60,60,.12){% endif %};border:2px solid {% if result.valid %}var(--safe){% else %}var(--danger){% endif %};display:flex;align-items:center;justify-content:center;font-size:22px">
+          {% if result.valid %}✔{% else %}✘{% endif %}
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:{% if result.valid %}var(--safe){% else %}var(--danger){% endif %}">
+            {% if result.valid %}SIGNATURE VALID — EVIDENCE INTACT{% else %}SIGNATURE INVALID{% endif %}
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">{{ result.filename }}</div>
+        </div>
+      </div>
+      {% if result.valid %}
+      <table class="meta-table">
+        <tr><td>Examiner</td><td>{{ result.examiner }}</td></tr>
+        <tr><td>Signed At</td><td>{{ result.signed_at }}</td></tr>
+        <tr><td>Algorithm</td><td>{{ result.algorithm }}</td></tr>
+        <tr><td>SHA-256</td><td style="word-break:break-all;font-family:'Share Tech Mono',monospace;font-size:10px">{{ result.sha256 }}</td></tr>
+      </table>
+      {% else %}
+      <div class="alert alert-error" style="margin-top:0">{{ result.error }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

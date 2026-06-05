@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Analytics Dashboard — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Analytics Dashboard</h1>
+  <p>// CRIME TYPES · RISK LEVELS · EVIDENCE CATEGORIES · TIMELINE GROWTH · CASE TRENDS</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ data.total_evidence }}</div><div class="stat-label">Total Evidence</div></div>
+  <div class="stat-card"><div class="stat-value">{{ data.total_cases }}</div><div class="stat-label">Cases</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ data.risk_levels.get('HIGH_RISK',0) }}</div><div class="stat-label">High Risk</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ data.crime_types|length }}</div><div class="stat-label">Crime Types</div></div>
+</div>
+
+<!-- Row 1: Crime Types + Risk Levels -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Crime Type Distribution</div>
+    <canvas id="crimeChart" height="260"></canvas>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Risk Level Distribution</div>
+    <canvas id="riskChart" height="260"></canvas>
+  </div>
+</div>
+
+<!-- Row 2: Evidence Categories + Audit Events -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Evidence Categories</div>
+    <canvas id="catChart" height="260"></canvas>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Audit Event Types</div>
+    <canvas id="auditChart" height="260"></canvas>
+  </div>
+</div>
+
+<!-- Row 3: Timeline Growth (full width) -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Evidence Upload Timeline (Last 30 Days)</div>
+  <canvas id="timelineChart" height="140"></canvas>
+</div>
+
+<!-- Data tables -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Top Crime Types</div>
+    <table>
+      <tr><th>Crime Type</th><th>Count</th><th>Bar</th></tr>
+      {% set max_c = data.crime_types.values()|list|max if data.crime_types else 1 %}
+      {% for ct, cnt in data.crime_types.items() %}
+      <tr>
+        <td><span class="badge badge-danger" style="font-size:9px">{{ ct }}</span></td>
+        <td style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent)">{{ cnt }}</td>
+        <td>
+          <div style="background:rgba(255,255,255,.05);border-radius:3px;height:6px;width:100px">
+            <div style="width:{{ (cnt/max_c*100)|int }}%;height:6px;border-radius:3px;background:var(--danger)"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Risk Level Summary</div>
+    <table>
+      <tr><th>Level</th><th>Count</th><th>Status</th></tr>
+      {% for lvl, cnt in data.risk_levels.items() %}
+      <tr>
+        <td>{{ lvl.replace('_',' ') }}</td>
+        <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">{{ cnt }}</td>
+        <td>
+          <span class="badge {% if 'HIGH' in lvl or 'CRITICAL' in lvl %}badge-danger{% elif 'MEDIUM' in lvl %}badge-warn{% elif 'LOW' in lvl %}badge-info{% else %}badge-safe{% endif %}">
+            {{ lvl.split('_')[0] }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const D   = {{ data_json | safe }};
+const ACCENT  = '#00ffe7';
+const ACCENT2 = '#0088ff';
+const DANGER  = '#ff3c3c';
+const WARN    = '#ffb800';
+const SAFE    = '#00ff88';
+const PURPLE  = '#cc44ff';
+const MUTED   = '#4a7090';
+
+const chartDefaults = {
+  plugins: {legend:{labels:{color:'#c8dff0',font:{family:'Share Tech Mono, monospace',size:11}}}},
+  scales: {
+    x: {ticks:{color:'#4a7090',font:{family:'Share Tech Mono, monospace',size:10}},
+        grid:{color:'rgba(0,255,231,0.05)'}},
+    y: {ticks:{color:'#4a7090',font:{family:'Share Tech Mono, monospace',size:10}},
+        grid:{color:'rgba(0,255,231,0.05)'}}
+  }
+};
+
+// Palette generator
+const palette = [DANGER,ACCENT,WARN,PURPLE,SAFE,ACCENT2,'#ff6699','#ff8800','#00ccff','#aaff00'];
+
+// 1. Crime Types — horizontal bar
+new Chart(document.getElementById('crimeChart'), {
+  type: 'bar',
+  data: {
+    labels: Object.keys(D.crime_types),
+    datasets:[{
+      label: 'Files',
+      data: Object.values(D.crime_types),
+      backgroundColor: palette.slice(0, Object.keys(D.crime_types).length).map(c=>c+'99'),
+      borderColor:     palette.slice(0, Object.keys(D.crime_types).length),
+      borderWidth: 1, borderRadius: 4,
+    }]
+  },
+  options:{...chartDefaults, indexAxis:'y',
+    plugins:{...chartDefaults.plugins, title:{display:false}}}
+});
+
+// 2. Risk Levels — doughnut
+const riskLabels = Object.keys(D.risk_levels).map(k=>k.replace(/_/g,' '));
+const riskColors = Object.keys(D.risk_levels).map(k=>
+  k.includes('CRITICAL')?DANGER:k.includes('HIGH')?DANGER+'99':
+  k.includes('MEDIUM')?WARN:k.includes('LOW')?ACCENT2:SAFE);
+new Chart(document.getElementById('riskChart'), {
+  type: 'doughnut',
+  data: {labels: riskLabels, datasets:[{data: Object.values(D.risk_levels),
+    backgroundColor: riskColors, borderColor:'#020b18', borderWidth:2}]},
+  options:{...chartDefaults,
+    plugins:{...chartDefaults.plugins,
+      legend:{position:'right',labels:{color:'#c8dff0',font:{family:'Share Tech Mono, monospace',size:10}}}}}
+});
+
+// 3. Evidence Categories — polar
+new Chart(document.getElementById('catChart'), {
+  type: 'polarArea',
+  data: {
+    labels: Object.keys(D.evidence_cats),
+    datasets:[{data: Object.values(D.evidence_cats),
+      backgroundColor: palette.map(c=>c+'66'),
+      borderColor: palette, borderWidth:1}]
+  },
+  options:{...chartDefaults,
+    plugins:{...chartDefaults.plugins,legend:{position:'right',labels:{color:'#c8dff0',font:{size:10}}}},
+    scales:{r:{ticks:{color:'#4a7090',backdropColor:'transparent'},
+               grid:{color:'rgba(0,255,231,0.05)'}}}}
+});
+
+// 4. Audit Events — bar
+new Chart(document.getElementById('auditChart'), {
+  type:'bar',
+  data:{
+    labels: Object.keys(D.audit_events),
+    datasets:[{label:'Events', data: Object.values(D.audit_events),
+      backgroundColor: ACCENT2+'88', borderColor: ACCENT2, borderWidth:1, borderRadius:4}]
+  },
+  options:{...chartDefaults}
+});
+
+// 5. Timeline growth — line
+const days   = Object.keys(D.daily_growth);
+const counts = Object.values(D.daily_growth);
+let cumulative = 0;
+const cumCounts = counts.map(v => cumulative += v);
+new Chart(document.getElementById('timelineChart'), {
+  type:'line',
+  data:{
+    labels: days,
+    datasets:[
+      {label:'New Evidence', data:counts,
+       borderColor:ACCENT, backgroundColor:ACCENT+'22', fill:true,
+       tension:0.4, pointRadius:3, pointBackgroundColor:ACCENT},
+      {label:'Cumulative',  data:cumCounts,
+       borderColor:ACCENT2, backgroundColor:'transparent',
+       tension:0.4, pointRadius:2, pointBackgroundColor:ACCENT2, borderDash:[4,4]}
+    ]
+  },
+  options:{...chartDefaults,
+    plugins:{...chartDefaults.plugins,legend:{labels:{color:'#c8dff0',font:{size:10}}}}}
+});
+</script>
+{% endblock %}

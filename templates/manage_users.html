@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Manage Users — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Manage Users</h1>
+  <p>// USER ACCOUNTS &mdash; PASSWORDS HASHED WITH SCRYPT</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start">
+
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">All User Accounts</div>
+    <table>
+      <tr><th>ID</th><th>Username</th><th>Role</th><th>Failed Logins</th><th>Action</th></tr>
+      {% for u in users %}
+      {% if u.role == 'administrator' %}{% set rcls = 'badge-danger' %}
+      {% elif u.role == 'forensic_analyst' %}{% set rcls = 'badge-info' %}
+      {% elif u.role == 'soc_analyst' %}{% set rcls = 'badge-warn' %}
+      {% else %}{% set rcls = 'badge-safe' %}{% endif %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td style="font-family:'Share Tech Mono',monospace;color:#fff">{{ u.username }}</td>
+        <td><span class="badge {{ rcls }}">{{ u.role.replace('_',' ').title() }}</span></td>
+        <td style="color:{% if u.failed_logins and u.failed_logins >= 3 %}var(--danger){% else %}var(--muted){% endif %}">{{ u.failed_logins or 0 }}</td>
+        <td>
+          {% if u.username != 'admin' %}
+          <form method="POST" style="display:inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="uid" value="{{ u.id }}">
+            <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete user {{ u.username }}?')">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Add New User</div>
+    <form method="POST">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="add">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" name="new_username" placeholder="e.g. analyst02" autocomplete="off" maxlength="64">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password (min 8 chars)</label>
+        <input class="form-input" name="new_password" type="password" placeholder="••••••••" maxlength="128">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input" name="new_role">
+          <option value="administrator">Administrator</option>
+          <option value="forensic_analyst" selected>Forensic Analyst</option>
+          <option value="soc_analyst">SOC Analyst</option>
+          <option value="red_team_operator">Red Team Operator</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">&#43; CREATE USER</button>
+    </form>
+    <p style="font-size:11px;color:var(--muted);margin-top:12px;font-family:'Share Tech Mono',monospace">
+      &#9679; Passwords hashed with scrypt (memory-hard)<br>
+      &#9679; Plain text never saved to database<br>
+      &#9679; Accounts lock after 5 failed attempts
+    </p>
+  </div>
+
+</div>
+
+<div class="card" style="border-color:rgba(0,255,231,.3)">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">&#128274; Default Login Credentials</div>
+  <table>
+    <tr><th>Username</th><th>Password</th><th>Role</th></tr>
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">admin</td>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--safe)">Admin@123</td>
+      <td><span class="badge badge-danger">Administrator</span></td>
+    </tr>
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">Arshu29</td>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--safe)">Arsh@123</td>
+      <td><span class="badge badge-info">Forensic Analyst</span></td>
+    </tr>
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">soc_analyst</td>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--safe)">SOC@analyst1</td>
+      <td><span class="badge badge-warn">SOC Analyst</span></td>
+    </tr>
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">red_operator</td>
+      <td style="font-family:'Share Tech Mono',monospace;color:var(--safe)">RedTeam@99</td>
+      <td><span class="badge badge-safe">Red Team Operator</span></td>
+    </tr>
+  </table>
+  <p style="font-size:11px;color:var(--muted);margin-top:10px;font-family:'Share Tech Mono',monospace">&#9679; Change passwords after first login in production</p>
+</div>
+{% endblock %}

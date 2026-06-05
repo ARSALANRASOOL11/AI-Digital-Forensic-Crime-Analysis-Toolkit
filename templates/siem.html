@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}SIEM Integration{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>SIEM Integration</h1>
+  <p>// WAZUH · ELASTIC SECURITY · SIGMA RULES GENERATOR</p>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+  <div class="card" style="border-color:{% if status.wazuh.connected %}rgba(0,255,136,.3){% else %}rgba(74,112,144,.3){% endif %}">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div class="status-dot" style="background:{% if status.wazuh.connected %}var(--safe){% else %}var(--muted){% endif %}"></div>
+      <span style="font-size:13px;font-weight:700;color:{% if status.wazuh.connected %}var(--safe){% else %}var(--muted){% endif %}">WAZUH {% if status.wazuh.connected %}CONNECTED{% else %}NOT CONFIGURED{% endif %}</span>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.7">Set: <code style="background:var(--panel);padding:1px 5px;border-radius:3px">WAZUH_HOST</code> <code style="background:var(--panel);padding:1px 5px;border-radius:3px">WAZUH_USER</code> <code style="background:var(--panel);padding:1px 5px;border-radius:3px">WAZUH_PASS</code></p>
+  </div>
+  <div class="card" style="border-color:{% if status.elastic.connected %}rgba(0,255,136,.3){% else %}rgba(74,112,144,.3){% endif %}">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div class="status-dot" style="background:{% if status.elastic.connected %}var(--safe){% else %}var(--muted){% endif %}"></div>
+      <span style="font-size:13px;font-weight:700;color:{% if status.elastic.connected %}var(--safe){% else %}var(--muted){% endif %}">ELASTICSEARCH {% if status.elastic.connected %}CONNECTED{% else %}NOT CONFIGURED{% endif %}</span>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.7">Set: <code style="background:var(--panel);padding:1px 5px;border-radius:3px">ELASTIC_HOST</code> <code style="background:var(--panel);padding:1px 5px;border-radius:3px">ELASTIC_USER</code> <code style="background:var(--panel);padding:1px 5px;border-radius:3px">ELASTIC_PASS</code></p>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Generate Sigma Rules</div>
+    <p style="font-size:12px;color:var(--text);margin-bottom:14px">Auto-generate Sigma detection rules from all evidence. Import into Splunk, QRadar, Elastic, Wazuh.</p>
+    <form method="POST"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary" name="action" value="generate_sigma" type="submit" style="width:100%;justify-content:center">📋 GENERATE SIGMA RULES</button>
+    </form>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Index to Elasticsearch</div>
+    <p style="font-size:12px;color:var(--text);margin-bottom:14px">Push all evidence to <code style="background:var(--panel);padding:1px 5px;border-radius:3px">cfis-forensics</code> Elasticsearch index.</p>
+    <form method="POST"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline" name="action" value="elastic_index" type="submit" style="width:100%;justify-content:center" {% if not status.elastic.connected %}disabled{% endif %}>📡 INDEX ALL EVIDENCE</button>
+    </form>
+  </div>
+</div>
+{% if index_result %}
+<div class="alert {% if index_result.success > 0 %}alert-success{% else %}alert-error{% endif %}">
+  {% if index_result.success > 0 %}✔ Indexed {{ index_result.success }}/{{ index_result.total }} records{% else %}✘ {{ index_result.errors[0] if index_result.errors else 'Error' }}{% endif %}
+</div>{% endif %}
+{% if sigma_rules %}
+<div class="card">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">✔ {{ sigma_rules|length }} SIGMA RULE(S) GENERATED</div>
+  {% for rule_item in sigma_rules %}
+  <div style="margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span class="badge badge-danger">{{ rule_item.crime }}</span>
+      <span style="font-size:12px;color:var(--text)">{{ rule_item.filename }}</span>
+      <span class="hash-cell" style="font-size:10px;margin-left:auto">{{ rule_item.case_id }}</span>
+    </div>
+    <pre style="background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:12px;font-size:10px;color:var(--text);white-space:pre-wrap;font-family:'Share Tech Mono',monospace;max-height:220px;overflow-y:auto">{{ rule_item.rule }}</pre>
+  </div>{% endfor %}
+</div>{% endif %}
+<div class="card" style="border-color:rgba(0,136,255,.3)">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent2);font-family:'Share Tech Mono',monospace;margin-bottom:12px">📖 QUICK SETUP</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:12px;color:var(--text);line-height:1.8">
+    <div><strong style="color:var(--accent)">Wazuh:</strong><br>
+    1. Install Wazuh manager<br>
+    2. <code style="background:var(--panel);padding:1px 5px;border-radius:3px">WAZUH_HOST=https://your-wazuh:55000</code><br>
+    3. <code style="background:var(--panel);padding:1px 5px;border-radius:3px">WAZUH_USER=wazuh WAZUH_PASS=pass</code></div>
+    <div><strong style="color:var(--accent)">Elastic:</strong><br>
+    1. <code style="background:var(--panel);padding:1px 5px;border-radius:3px">docker run -p 9200:9200 elasticsearch:8.11.0</code><br>
+    2. <code style="background:var(--panel);padding:1px 5px;border-radius:3px">ELASTIC_HOST=http://localhost:9200</code><br>
+    3. Click Index All Evidence above</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Video Crime Analysis{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Video Crime Detection</h1>
+  <p>// AI FRAME-BY-FRAME ANALYSIS · CRIME DETECTION · FORENSIC SUMMARY</p>
+</div>
+
+<div style="display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start">
+
+  <!-- Upload + Select -->
+  <div>
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Upload Video Evidence</div>
+      <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="upload_video">
+        <div class="file-drop" onclick="document.getElementById('vf').click()" style="padding:20px">
+          <div style="font-size:28px;margin-bottom:8px">🎬</div>
+          <p style="font-size:12px">Click to select video file</p>
+          <p id="vfn" style="color:var(--accent);font-size:11px;font-family:'Share Tech Mono',monospace;margin-top:5px"></p>
+          <p style="font-size:10px;color:var(--muted);margin-top:5px">{{ video_exts|join(' ') }}</p>
+          <input type="file" id="vf" name="file" style="display:none" accept="video/*" onchange="document.getElementById('vfn').textContent=this.files[0]?.name||''">
+        </div><br>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">🎬 UPLOAD & ANALYSE</button>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Analyse Existing Evidence</div>
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="analyse_existing">
+        <select class="form-input" name="ev_id" style="margin-bottom:10px">
+          <option value="">Select evidence file...</option>
+          {% for r in ev_rows %}<option value="{{ r[0] }}">{{ r[1] }} — {{ r[2] }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-outline" type="submit" style="width:100%;justify-content:center">▶ ANALYSE VIDEO</button>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:14px;padding:12px 14px">
+      <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;line-height:1.8">
+        ● Frames extracted every 3 seconds<br>
+        ● Max 120 frames per video<br>
+        ● Max file size: 500 MB<br>
+        ● AI crime detection per frame<br>
+        ● Weighted confidence scoring
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">🎬</div>
+      <p>Upload a video or select existing evidence to run AI crime detection.</p>
+    </div>
+
+    {% elif not result.success %}
+    <div class="alert alert-error">✘ {{ result.error }}</div>
+
+    {% else %}
+    {% set vc = 'var(--danger)' if result.severity=='CRITICAL' else 'var(--warn)' if result.severity=='HIGH' else 'var(--accent2)' if result.severity=='MEDIUM' else 'var(--safe)' %}
+
+    <!-- Summary card -->
+    <div class="card" style="border-color:{{ vc }};margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div style="width:54px;height:54px;border-radius:50%;background:rgba(0,0,0,.3);border:2px solid {{ vc }};display:flex;align-items:center;justify-content:center;font-size:22px">🎬</div>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:{{ vc }};letter-spacing:1px">{{ result.crime_type }}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px">
+            {{ result.filename }} · {{ result.video_meta.duration_str }} · {{ result.frame_count }} frames analysed
+          </div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:26px;font-weight:800;color:{{ vc }};font-family:'Share Tech Mono',monospace">{{ result.confidence }}%</div>
+          <div style="font-size:10px;color:var(--muted)">CONFIDENCE</div>
+        </div>
+      </div>
+
+      <!-- Forensic summary -->
+      <div style="padding:12px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:14px;border-left:3px solid {{ vc }}">
+        <div style="font-size:10px;color:{{ vc }};font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:5px">🤖 AI FORENSIC SUMMARY</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.7">{{ result.forensic_summary }}</div>
+      </div>
+
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div style="text-align:center;padding:10px;background:var(--panel);border-radius:6px">
+          <div style="font-size:20px;font-weight:800;color:var(--accent);font-family:'Share Tech Mono',monospace">{{ result.frame_count }}</div>
+          <div style="font-size:10px;color:var(--muted)">Frames</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--panel);border-radius:6px">
+          <div style="font-size:20px;font-weight:800;color:{{ vc }};font-family:'Share Tech Mono',monospace">{{ result.severity }}</div>
+          <div style="font-size:10px;color:var(--muted)">Severity</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--panel);border-radius:6px">
+          <div style="font-size:20px;font-weight:800;color:var(--accent);font-family:'Share Tech Mono',monospace">{{ result.video_meta.duration_str }}</div>
+          <div style="font-size:10px;color:var(--muted)">Duration</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:var(--panel);border-radius:6px">
+          <div style="font-size:20px;font-weight:800;color:var(--accent2);font-family:'Share Tech Mono',monospace">{{ result.video_meta.fps }}</div>
+          <div style="font-size:10px;color:var(--muted)">FPS</div>
+        </div>
+      </div>
+
+      <!-- Detected objects -->
+      {% if result.detected_objects %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">DETECTED OBJECTS</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          {% for obj in result.detected_objects %}
+          <div style="padding:4px 12px;border:1px solid var(--border);border-radius:20px;background:var(--panel);font-size:11px;color:var(--text);font-family:'Share Tech Mono',monospace">
+            {{ obj.label_friendly }} <span style="color:var(--muted)">×{{ obj.count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Crime distribution -->
+      {% if result.crime_distribution %}
+      <div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">FRAME-LEVEL CRIME DISTRIBUTION</div>
+        {% set max_count = result.crime_distribution.values()|list|max %}
+        {% for crime, count in result.crime_distribution.items() %}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <div style="font-size:11px;color:var(--text);flex:1">{{ crime }}</div>
+          <div style="width:120px;background:rgba(255,255,255,.05);border-radius:3px;height:5px">
+            <div style="width:{{ (count/max_count*100)|int }}%;height:5px;border-radius:3px;background:var(--accent)"></div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;min-width:20px">{{ count }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Key frames -->
+    {% if result.key_frames %}
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">KEY EVIDENCE FRAMES ({{ result.key_frames|length }})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+        {% for frame in result.key_frames %}
+        {% set fc = 'var(--danger)' if frame.severity=='CRITICAL' else 'var(--warn)' if frame.severity=='HIGH' else 'var(--accent2)' %}
+        <div style="border:1px solid {{ fc }};border-radius:6px;overflow:hidden">
+          {% if frame.thumbnail_b64 %}
+          <img src="data:image/jpeg;base64,{{ frame.thumbnail_b64 }}" style="width:100%;display:block">
+          {% endif %}
+          <div style="padding:6px 8px;background:var(--panel)">
+            <div style="font-size:10px;color:{{ fc }};font-family:'Share Tech Mono',monospace">{{ frame.crime_type[:25] }}</div>
+            <div style="font-size:10px;color:var(--muted)">⏱ {{ frame.timestamp_str }} · {{ frame.confidence }}%</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

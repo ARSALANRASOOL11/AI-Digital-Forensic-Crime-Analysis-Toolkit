@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}MFA Setup — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Multi-Factor Authentication</h1><p>// TOTP / GOOGLE AUTHENTICATOR SETUP</p></div>
+{% if step == 'verify' %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:780px">
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;margin-bottom:14px">STEP 1 — SCAN QR CODE</div>
+    <img src="data:image/png;base64,{{ qr_b64 }}" style="width:100%;max-width:220px;border:2px solid var(--border);border-radius:8px;display:block;margin:0 auto 14px">
+    <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-align:center;margin-bottom:8px">OR ENTER MANUALLY</div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;text-align:center;word-break:break-all;color:var(--accent)">{{ secret }}</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted)">
+      <strong style="color:var(--text)">Steps:</strong><br>
+      1. Open Google Authenticator / Authy<br>
+      2. Tap + → Scan QR or enter key above<br>
+      3. Account: {{ session.user }} · Type: Time-based
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;margin-bottom:14px">STEP 2 — VERIFY CODE</div>
+    <form method="POST">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="verify">
+      <div class="form-group">
+        <label class="form-label">Enter 6-digit code from authenticator</label>
+        <input class="form-input" name="totp_code" placeholder="000000" maxlength="6" autofocus style="font-size:24px;letter-spacing:8px;text-align:center">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">✔ VERIFY &amp; ENABLE MFA</button>
+    </form>
+    <div style="margin-top:18px;padding:12px;background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.2);border-radius:6px">
+      <div style="font-size:10px;color:var(--warn);font-family:'Share Tech Mono',monospace;margin-bottom:6px">⚠ BACKUP CODES (save these!)</div>
+      {% for code in backup_codes %}
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);margin-bottom:2px">{{ code }}</div>
+      {% endfor %}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Each code can only be used once if you lose your phone.</div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card" style="max-width:480px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+    <div style="width:50px;height:50px;border-radius:50%;background:{% if mfa and mfa.enabled %}rgba(0,255,136,.12){% else %}rgba(74,112,144,.15){% endif %};border:2px solid {% if mfa and mfa.enabled %}var(--safe){% else %}var(--muted){% endif %};display:flex;align-items:center;justify-content:center;font-size:22px">
+      {% if mfa and mfa.enabled %}✔{% else %}🔒{% endif %}
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:700;color:{% if mfa and mfa.enabled %}var(--safe){% else %}var(--muted){% endif %}">MFA {% if mfa and mfa.enabled %}ENABLED{% else %}DISABLED{% endif %}</div>
+      <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace">Compatible with Google Authenticator, Authy, Microsoft Authenticator</div>
+    </div>
+  </div>
+  {% if not (mfa and mfa.enabled) %}
+  <form method="POST">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="generate">
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">⚙ SETUP GOOGLE AUTHENTICATOR</button>
+  </form>
+  {% else %}
+  <form method="POST" onsubmit="return confirm('Disable MFA? Your account will be less secure.')">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="disable">
+    <button class="btn btn-danger" type="submit" style="width:100%;justify-content:center">DISABLE MFA</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

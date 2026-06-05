@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Autopsy Cases — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Autopsy Case Integration</h1>
+  <p>// CREATE CASES · READ ARTIFACTS · BROWSER HISTORY · USB · INSTALLED PROGRAMS</p>
+</div>
+
+<!-- Autopsy status -->
+<div class="card" style="margin-bottom:18px;padding:12px 18px;border-color:{% if autopsy_available %}rgba(0,255,136,.3){% else %}rgba(0,136,255,.3){% endif %}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="status-dot" style="background:{% if autopsy_available %}var(--safe){% else %}var(--accent2){% endif %}"></div>
+    <span style="font-size:11px;font-family:'Share Tech Mono',monospace;color:{% if autopsy_available %}var(--safe){% else %}var(--accent2){% endif %}">
+      {% if autopsy_available %}AUTOPSY DETECTED — FULL GUI INTEGRATION AVAILABLE
+      {% else %}AUTOPSY NOT FOUND — Case DB creation available · Download from autopsy.com{% endif %}
+    </span>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start">
+
+  <!-- Left: Create case + Read DB -->
+  <div>
+    <div class="card">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Create New Autopsy Case</div>
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="create">
+        <div class="form-group">
+          <label class="form-label">Case Name</label>
+          <input class="form-input" name="case_name" placeholder="e.g. CASE-2024-001" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Examiner</label>
+          <input class="form-input" name="examiner" value="{{ session.user }}" placeholder="Examiner name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input" name="description" rows="2" placeholder="Brief case description"></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">📁 CREATE AUTOPSY CASE</button>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Read Existing Case DB</div>
+      <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="read">
+        <div class="form-group">
+          <label class="form-label">Autopsy .db File Path</label>
+          {% if existing_cases %}
+          <select class="form-input" name="db_path">
+            {% for db in existing_cases %}
+            <option value="{{ db }}">{{ db.split('/')[-1] }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input class="form-input" name="db_path" placeholder="/path/to/case.db">
+          {% endif %}
+        </div>
+        <button class="btn btn-outline" type="submit" style="width:100%;justify-content:center">📖 READ ARTIFACTS</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: Results -->
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">📂</div>
+      <p>Create a case or read an existing Autopsy case database to see artifacts.</p>
+    </div>
+
+    {% elif result.action == 'created' %}
+    <div class="alert alert-success">✔ Case created: <strong>{{ result.case_name }}</strong></div>
+    <div class="card">
+      <table class="meta-table">
+        <tr><td>Case Path</td><td style="word-break:break-all">{{ result.case_path }}</td></tr>
+        <tr><td>.aut File</td><td style="word-break:break-all">{{ result.aut_file }}</td></tr>
+        <tr><td>Database</td><td style="word-break:break-all">{{ result.db_path }}</td></tr>
+        <tr><td>Case UUID</td><td>{{ result.case_uuid }}</td></tr>
+      </table>
+      <div style="margin-top:14px;padding:12px;background:rgba(0,136,255,.06);border:1px solid rgba(0,136,255,.2);border-radius:6px;font-size:12px;color:var(--text)">
+        <strong style="color:var(--accent)">Next steps:</strong><br>
+        1. Open Autopsy → File → Open Case → select the <code>.aut</code> file above<br>
+        2. Add Data Source → select your disk image or folder<br>
+        3. Let Autopsy ingest and analyse<br>
+        4. Come back here → Read Case DB to view all artifacts
+      </div>
+    </div>
+
+    {% elif result.action == 'artifacts' %}
+    {% set arts = result.artifacts %}
+    {% set s = arts.summary %}
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value">{{ s.total_artifacts }}</div><div class="stat-label">Total Artifacts</div></div>
+      <div class="stat-card"><div class="stat-value">{{ s.browser_history_count }}</div><div class="stat-label">Web History</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ s.usb_devices_count }}</div><div class="stat-label">USB Devices</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ s.alerts_count }}</div><div class="stat-label">Alerts</div></div>
+    </div>
+
+    {% if arts.alerts %}
+    <div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">⚠ ALERTS</div>
+      {% for a in arts.alerts %}<div style="font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">● {{ a }}</div>{% endfor %}
+    </div>{% endif %}
+
+    {% macro artifact_table(title, items, cols) %}
+    {% if items %}
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">{{ title }} ({{ items|length }})</div>
+      <table><tr>{% for c in cols %}<th>{{ c }}</th>{% endfor %}</tr>
+      {% for item in items[:30] %}<tr>{% for c in cols %}
+        <td style="font-size:11px;word-break:break-all;max-width:200px">{{ item.get(c.lower().replace(' ','_').replace('/','_'),'') or item.get(c.lower(),'') | string | truncate(60) }}</td>
+      {% endfor %}</tr>{% endfor %}</table>
+    </div>{% endif %}
+    {% endmacro %}
+
+    {{ artifact_table('Browser History',   arts.browser_history,    ['url','title','datetime','domain']) }}
+    {{ artifact_table('Downloads',         arts.downloads,          ['url','path','datetime']) }}
+    {{ artifact_table('Search Queries',    arts.search_queries,     ['query','datetime']) }}
+    {{ artifact_table('USB Devices',       arts.usb_devices,        ['make','model','device_id','datetime']) }}
+    {{ artifact_table('Installed Programs',arts.installed_programs, ['name','version','install_date']) }}
+    {{ artifact_table('User Accounts',     arts.os_accounts,        ['username','full_name','last_login']) }}
+    {{ artifact_table('Recent Documents',  arts.recent_documents,   ['path','datetime']) }}
+    {{ artifact_table('Wifi Networks',     arts.wifi_networks,      ['ssid','datetime']) }}
+    {{ artifact_table('Email Messages',    arts.email_messages,     ['from','subject','datetime']) }}
+    {{ artifact_table('Keyword Hits',      arts.keyword_hits,       ['keyword','preview','path']) }}
+    {{ artifact_table('Hash Set Hits',     arts.hash_hits,          ['set_name','path']) }}
+    {{ artifact_table('GPS Locations',     arts.gps_locations,      ['lat','lon','datetime']) }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

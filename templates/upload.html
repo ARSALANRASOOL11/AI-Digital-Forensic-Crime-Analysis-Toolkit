@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Upload Evidence — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Upload Evidence</h1>
+  <p>// SECURE FILE INGESTION &mdash; AI RISK + YARA ANALYSIS ON UPLOAD</p>
+</div>
+
+{% if result %}
+  {% if result.success %}
+  <div class="alert alert-success">
+    ✔ Uploaded — Case ID: <strong>{{ result.cid }}</strong>
+    · Risk: <strong>{{ result.risk.score }}/100</strong>
+    · <span class="badge {% if result.risk.level == 'HIGH_RISK' %}badge-danger{% elif result.risk.level in ('MEDIUM_RISK','LOW_RISK') %}badge-warn{% else %}badge-safe{% endif %}">{{ result.risk.level.replace('_',' ') }}</span>
+    · Crime: <strong>{{ result.crime_type }}</strong>
+    {% if result.vt_result %}· {{ result.vt_result }}{% endif %}
+  </div>
+
+  {% if result.vision and result.vision.success %}
+  {% set v = result.vision %}
+  {% set vc = 'var(--danger)' if v.risk_level=='CRITICAL' else 'var(--warn)' if v.risk_level=='HIGH' else 'var(--accent2)' if v.risk_level=='MEDIUM' else 'var(--safe)' %}
+  <div class="card" style="border-color:{{ vc }};margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div style="width:54px;height:54px;border-radius:50%;background:rgba(0,0,0,.3);border:2px solid {{ vc }};display:flex;align-items:center;justify-content:center;font-size:22px">🔍</div>
+      <div>
+        <div style="font-size:16px;font-weight:800;color:{{ vc }};letter-spacing:1px">{{ v.crime_type }}</div>
+        <div style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px">
+          AI Vision Analysis · {{ v.engine }} · {{ v.processing_time_ms }}ms
+        </div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:26px;font-weight:800;color:{{ vc }};font-family:'Share Tech Mono',monospace">{{ v.confidence }}%</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Confidence</div>
+      </div>
+    </div>
+
+    <!-- Forensic Summary -->
+    {% if v.forensic_summary %}
+    <div style="padding:12px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:14px;border-left:3px solid {{ vc }}">
+      <div style="font-size:10px;color:{{ vc }};font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:5px">🤖 AI FORENSIC SUMMARY</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.7">{{ v.forensic_summary }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Detected objects -->
+    {% if v.detections %}
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">DETECTED OBJECTS ({{ v.detections|length }})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for det in v.detections %}
+        {% set det_color = 'var(--danger)' if det.forensic_label in ('blood','dead_body','gun','pistol','rifle','explosive') else 'var(--warn)' if det.forensic_label in ('knife','drugs','syringe','fire','weapon') else 'var(--accent2)' %}
+        <div style="padding:4px 10px;border:1px solid {{ det_color }}44;border-radius:20px;background:{{ det_color }}11">
+          <span style="font-size:11px;color:{{ det_color }};font-family:'Share Tech Mono',monospace">
+            {{ det.get('class_name', det.get('forensic_label','')).replace('_',' ') }}
+          </span>
+          <span style="font-size:10px;color:var(--muted);margin-left:4px">{{ det.confidence }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- OCR objects -->
+    {% if v.ocr_objects %}
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">OCR INDICATORS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for obj in v.ocr_objects %}
+        <span style="padding:3px 9px;border:1px solid rgba(255,184,0,.3);border-radius:20px;background:rgba(255,184,0,.08);font-size:10px;color:var(--warn);font-family:'Share Tech Mono',monospace">
+          {{ obj.class_name.replace('_',' ') }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- All crime matches -->
+    {% if v.all_crime_matches %}
+    <div>
+      <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;letter-spacing:1px;margin-bottom:8px">CRIME MATCH SCORES</div>
+      {% for match in v.all_crime_matches[:4] %}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="font-size:11px;color:{% if loop.first %}#fff{% else %}var(--muted){% endif %};flex:1">{{ match.crime }}</div>
+        <div style="width:120px;background:rgba(255,255,255,.05);border-radius:3px;height:5px">
+          <div style="width:{{ match.score }}%;height:5px;border-radius:3px;background:{% if loop.first %}{{ vc }}{% else %}var(--muted){% endif %}"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;min-width:30px;text-align:right">{{ match.score }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top:10px;font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">
+      Risk Level: <span style="color:{{ vc }}">{{ v.risk_level }}</span>
+      · Engine: {{ v.engine }}
+      · Install <code>pip install ultralytics</code> for full YOLOv8 support
+    </div>
+  </div>
+  {% endif %}
+
+  {% if result.yara_hits %}
+  <div class="card" style="border-color:rgba(255,184,0,.3);margin-bottom:18px">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--warn);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+      &#9888; YARA RULE MATCHES ({{ result.yara_hits|length }})
+    </div>
+    {% for hit in result.yara_hits %}
+    <div class="yara-hit {% if hit.severity == 'CRITICAL' %}yara-critical{% endif %}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span class="badge {% if hit.severity == 'CRITICAL' %}badge-danger{% elif hit.severity == 'HIGH' %}badge-warn{% else %}badge-info{% endif %}">
+          {{ hit.severity }}
+        </span>
+        <strong style="color:var(--accent);font-size:12px">{{ hit.rule }}</strong>
+        <span style="font-size:10px;color:var(--muted)">{{ hit.tags|join(', ') }}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text)">{{ hit.description }}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;font-family:'Share Tech Mono',monospace">
+        Matched: {{ hit.matches[:3]|join(' | ') }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card" style="max-width:560px;border-color:rgba(0,255,136,.2)">
+    <div style="font-size:11px;letter-spacing:2px;color:var(--safe);font-family:'Share Tech Mono',monospace;margin-bottom:10px">SHA-256 HASH</div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:12px;word-break:break-all;color:var(--text)">{{ result.hash }}</div>
+  </div>
+
+  {% else %}
+  <div class="alert alert-error">&#10008; {{ result.error }}</div>
+  {% endif %}
+{% endif %}
+
+<div class="card" style="max-width:560px">
+  <form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="file-drop" onclick="document.getElementById('fi').click()">
+      <div style="font-size:36px;margin-bottom:10px">&#128193;</div>
+      <p>Click to select evidence file or drag &amp; drop</p>
+      <p id="fn" style="color:var(--accent);font-size:12px;font-family:'Share Tech Mono',monospace"></p>
+      <input type="file" name="file" id="fi" style="display:none" required>
+    </div><br>
+    <button class="btn btn-primary" type="submit">&#11014; UPLOAD &amp; REGISTER EVIDENCE</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:560px">
+  <p style="font-size:12px;color:var(--muted);font-family:'Share Tech Mono',monospace;line-height:1.8">
+    &#9679; Filename sanitized &bull; path traversal stripped<br>
+    &#9679; Max file size: 50 MB<br>
+    &#9679; SHA-256 hash computed automatically<br>
+    &#9679; AI Risk Score (0–100): magic bytes, entropy, keywords<br>
+    &#9679; YARA rules scan: 11 rule families<br>
+    &#9679; VirusTotal hash lookup (set VIRUSTOTAL_API_KEY env var)<br>
+    &#9679; Unique Case ID &mdash; no duplicates on delete
+  </p>
+</div>
+{% endblock %}

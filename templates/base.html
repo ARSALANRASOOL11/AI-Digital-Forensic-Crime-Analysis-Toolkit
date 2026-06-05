@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Forensic Toolkit v4{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-badge">
+    <div class="status-dot"></div>SYSTEM ONLINE
+  </div>
+  <div class="topbar-title">&#11041; CYBER FORENSIC INTELLIGENCE SYSTEM &#11041;</div>
+  {% if session.user %}
+  <div class="topbar-user">
+    {{ session.user }}
+    {% if session.role == 'administrator' %}
+    <span class="badge badge-danger" style="font-size:9px">ADMIN</span>
+    {% elif session.role == 'forensic_analyst' %}
+    <span class="badge badge-info" style="font-size:9px">ANALYST</span>
+    {% elif session.role == 'soc_analyst' %}
+    <span class="badge badge-warn" style="font-size:9px">SOC</span>
+    {% else %}
+    <span class="badge badge-safe" style="font-size:9px">{{ session.role|upper }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- SIDEBAR -->
+{% if session.user %}
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h3>Control Center</h3>
+    <p>FORENSIC CONTROL CENTER</p>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Evidence</div>
+    <a href="{{ url_for('dashboard') }}" class="nav-link {% if active_page=='dashboard' %}active{% endif %}">
+      <span class="nav-icon">&#11035;</span> Dashboard
+    </a>
+    <a href="{{ url_for('upload') }}" class="nav-link {% if active_page=='upload' %}active{% endif %}">
+      <span class="nav-icon">&#11014;</span> Upload Evidence
+    </a>
+    <a href="{{ url_for('verify') }}" class="nav-link {% if active_page=='verify' %}active{% endif %}">
+      <span class="nav-icon">&#10006;</span> Integrity Verification
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">AI Analysis</div>
+    <a href="{{ url_for('metadata') }}" class="nav-link {% if active_page=='metadata' %}active{% endif %}">
+      <span class="nav-icon">&#128203;</span> Metadata Analysis
+    </a>
+    <a href="{{ url_for('autopsy') }}" class="nav-link {% if active_page=='autopsy' %}active{% endif %}">
+      <span class="nav-icon">&#128337;</span> Autopsy Timeline
+    </a>
+    <a href="{{ url_for('chat_page') }}" class="nav-link {% if active_page=='chat' %}active{% endif %}">
+      <span class="nav-icon">&#129302;</span> AI Investigator
+    </a>
+    <a href="{{ url_for('carve') }}" class="nav-link {% if active_page=='carve' %}active{% endif %}">
+      <span class="nav-icon">&#128268;</span> File Carving
+    </a>
+    <a href="{{ url_for('ml_analysis') }}" class="nav-link {% if active_page=='ml_analysis' %}active{% endif %}">
+      <span class="nav-icon">&#129504;</span> CNN / ML Analysis
+    </a>
+    <a href="{{ url_for('volatility') }}" class="nav-link {% if active_page=='volatility' %}active{% endif %}">
+      <span class="nav-icon">&#129302;</span> Memory Forensics
+    </a>
+    <a href="{{ url_for('ioc_extract') }}" class="nav-link {% if active_page=='ioc_extract' %}active{% endif %}">
+      <span class="nav-icon">&#128269;</span> IOC Extraction
+    </a>
+    <a href="{{ url_for('threat_intel') }}" class="nav-link {% if active_page=='threat_intel' %}active{% endif %}">
+      <span class="nav-icon">&#128248;</span> Threat Intelligence
+    </a>
+    <a href="{{ url_for('autopsy_import') }}" class="nav-link {% if active_page=='autopsy_import' %}active{% endif %}">
+      <span class="nav-icon">&#128230;</span> Autopsy Import
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Case Management</div>
+    <a href="{{ url_for('notes') }}" class="nav-link {% if active_page=='notes' %}active{% endif %}">
+      <span class="nav-icon">&#128221;</span> Investigator Notes
+    </a>
+    <a href="{{ url_for('custody') }}" class="nav-link {% if active_page=='custody' %}active{% endif %}">
+      <span class="nav-icon">&#128274;</span> Chain of Custody
+    </a>
+    <a href="{{ url_for('audit') }}" class="nav-link {% if active_page=='audit' %}active{% endif %}">
+      <span class="nav-icon">&#128196;</span> Audit Trail
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Account</div>
+    {% if session.role == 'administrator' %}
+    <a href="{{ url_for('manage_users') }}" class="nav-link {% if active_page=='manage_users' %}active{% endif %}">
+      <span class="nav-icon">&#128100;</span> Manage Users
+    </a>
+    {% endif %}
+    <a href="{{ url_for('analytics') }}" class="nav-link {% if active_page=='analytics' %}active{% endif %}">
+      <span class="nav-icon">&#128200;</span> Analytics
+    </a>
+    <a href="{{ url_for('evidence_graph_view') }}" class="nav-link {% if active_page=='graph' %}active{% endif %}">
+      <span class="nav-icon">&#127760;</span> Evidence Graph
+    </a>
+    <a href="{{ url_for('malware_sandbox') }}" class="nav-link {% if active_page=='sandbox' %}active{% endif %}">
+      <span class="nav-icon">&#128717;</span> Malware Sandbox
+    </a>
+    <a href="{{ url_for('ai_assistant_page') }}" class="nav-link {% if active_page=='ai_assistant' %}active{% endif %}">
+      <span class="nav-icon">&#129504;</span> AI Assistant (Llama)
+    </a>
+    <a href="{{ url_for('autopsy_case_view') }}" class="nav-link {% if active_page=='autopsy_case' %}active{% endif %}">
+      <span class="nav-icon">&#128193;</span> Autopsy Cases
+    </a>
+    <a href="{{ url_for('mfa_setup') }}" class="nav-link {% if active_page=='mfa_setup' %}active{% endif %}">
+      <span class="nav-icon">&#128272;</span> MFA Setup
+    </a>
+    <a href="{{ url_for('encrypt') }}" class="nav-link {% if active_page=='encrypt' %}active{% endif %}">
+      <span class="nav-icon">&#128274;</span> Encrypt Evidence
+    </a>
+        <a href="{{ url_for('logout') }}" class="nav-link">
+      <span class="nav-icon">&#8617;</span> Logout
+    </a>
+  </div>
+
+  <div class="sidebar-footer">v4.0 &bull; FORENSIC TOOLKIT</div>
+</div>
+{% endif %}
+
+<!-- MAIN -->
+<div class="{% if session.user %}main{% endif %}">
+  <div class="content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

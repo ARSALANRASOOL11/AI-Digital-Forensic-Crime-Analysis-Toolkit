@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>AI Forensic Dashboard</h1>
+  <p>// EVIDENCE MANAGEMENT &amp; REAL-TIME AI ANALYSIS</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ total }}</div><div class="stat-label">Total Files</div></div>
+  <div class="stat-card"><div class="stat-value">{{ cases_count }}</div><div class="stat-label">Cases</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ tampered }}</div><div class="stat-label">Tampered</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ risky }}</div><div class="stat-label">At Risk</div></div>
+</div>
+
+<form class="search-bar" style="flex-wrap:wrap;gap:8px">
+  <input name="search" placeholder="Search case ID, filename, crime type…" value="{{ search }}" style="flex:2;min-width:200px">
+  <select name="crime_type" class="form-input" style="flex:1;min-width:160px;padding:9px 13px">
+    <option value="">All Crime Types</option>
+    {% for ct in all_crime_types %}
+    <option value="{{ ct }}" {% if ct == crime_filter %}selected{% endif %}>{{ ct }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn-primary" type="submit">SEARCH</button>
+  {% if search or crime_filter %}<a href="{{ url_for('dashboard') }}" class="btn btn-ghost">CLEAR</a>{% endif %}
+</form>
+
+{% if not grouped %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted)">No evidence records found.</div>
+{% endif %}
+
+{% for cid, items in grouped.items() %}
+<div class="card scanline-container">
+  <div class="case-header">
+    <span class="case-id">&#128193; {{ cid }}</span>
+    <div class="case-actions">
+      <a href="{{ url_for('notes', cid=cid) }}" class="btn btn-ghost btn-sm">&#128221; Notes</a>
+      <a href="{{ url_for('custody', cid=cid) }}" class="btn btn-ghost btn-sm">&#128274; Custody</a>
+      <a href="{{ url_for('report', cid=cid) }}" class="btn btn-outline btn-sm">&#11015; PDF</a>
+      <a href="{{ url_for('export', cid=cid) }}" class="btn btn-ghost btn-sm">&#128230; ZIP</a>
+    </div>
+  </div>
+  <table>
+    <tr>
+      <th>Filename</th><th>SHA-256</th><th>Integrity</th>
+      <th>AI Risk</th><th>Crime Type</th><th>Category</th><th>Uploaded</th><th>Actions</th>
+    </tr>
+    {% for r in items %}
+    {% set vstatus = verify_file(r[3], r[4]) %}
+    {% set risk = ai_risk_score(r[2], r[3]) %}
+    {% set sc = risk.score %}
+    {% if vstatus == 'MATCHED' %}{% set vcls = 'badge-safe' %}{% set vlbl = '✔ MATCHED' %}
+    {% elif vstatus == 'TAMPERED' %}{% set vcls = 'badge-danger' %}{% set vlbl = '✘ TAMPERED' %}
+    {% else %}{% set vcls = 'badge-warn' %}{% set vlbl = '⚠ MISSING' %}{% endif %}
+    {% if risk.level == 'HIGH_RISK' %}{% set acls = 'badge-danger' %}
+    {% elif risk.level == 'MEDIUM_RISK' %}{% set acls = 'badge-warn' %}
+    {% elif risk.level == 'LOW_RISK' %}{% set acls = 'badge-info' %}
+    {% else %}{% set acls = 'badge-safe' %}{% endif %}
+    {% if sc >= 70 %}{% set sc_color = 'var(--danger)' %}
+    {% elif sc >= 35 %}{% set sc_color = 'var(--warn)' %}
+    {% else %}{% set sc_color = 'var(--safe)' %}{% endif %}
+    <tr>
+      <td>{{ r[2] }}</td>
+      <td class="hash-cell">{{ r[4][:16] }}&#8230;</td>
+      <td><span class="badge {{ vcls }}">{{ vlbl }}</span></td>
+      <td>
+        <span class="badge {{ acls }}">{{ risk.level.replace('_',' ') }}</span>
+        <span class="risk-bar-wrap"><span class="risk-bar-fill" style="width:{{ sc }}%;background:{{ sc_color }}"></span></span>
+        <span style="font-size:10px;color:{{ sc_color }};font-family:'Share Tech Mono',monospace"> {{ sc }}</span>
+      </td>
+      <td><span class="badge badge-info" style="font-size:9px">{{ r[6] if r|length > 6 else 'Unclassified' }}</span></td>
+      <td><span class="badge badge-info" style="font-size:9px;background:rgba(0,136,255,.06)">{{ r[7] if r|length > 7 else 'Unknown' }}</span></td>
+      <td>
+        {% if r[5] %}
+          {% set ts = r[5]|float %}
+          {{ time.strftime('%Y-%m-%d %H:%M', time.localtime(ts)) }}
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('metadata', cid=r[1], filename=r[2]) }}" class="btn btn-ghost btn-sm" title="Metadata">&#128203;</a>
+        <a href="{{ url_for('notes', cid=r[1]) }}" class="btn btn-ghost btn-sm" title="Notes">&#128221;</a>
+        <a href="{{ url_for('custody', cid=r[1]) }}" class="btn btn-ghost btn-sm" title="Custody">&#128274;</a>
+        <a href="{{ url_for('carve', ev_id=r[0]) }}" class="btn btn-ghost btn-sm" title="File Carving">&#128268;</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endfor %}
+{% endblock %}

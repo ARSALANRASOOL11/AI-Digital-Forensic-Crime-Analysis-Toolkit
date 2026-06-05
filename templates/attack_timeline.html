@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Attack Timeline{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Attack Timeline Reconstruction</h1>
+  <p>// CHRONOLOGICAL ATTACK CHAIN · KILL CHAIN PHASES · EVENT NARRATIVE</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{ result.total_events }}</div><div class="stat-label">Total Events</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ result.phases_present|length }}</div><div class="stat-label">Phases</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ result.time_span }}</div><div class="stat-label">Time Span</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.temporal_gaps|length }}</div><div class="stat-label">Rapid Events</div></div>
+</div>
+
+{% if result.attack_chain %}
+<!-- Kill chain phases -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Attack Chain Progression</div>
+  <div style="display:flex;flex-wrap:wrap;gap:0;align-items:center">
+    {% for phase in result.attack_chain %}
+    {% set sc = 'var(--danger)' if phase.severity=='CRITICAL' else 'var(--warn)' if phase.severity=='HIGH' else 'var(--accent2)' %}
+    <div style="display:flex;align-items:center">
+      <div style="padding:8px 14px;background:rgba(0,0,0,.3);border:1px solid {{sc}};border-radius:6px;text-align:center;min-width:120px">
+        <div style="font-size:10px;color:{{sc}};font-family:'Share Tech Mono',monospace;letter-spacing:1px">{{ phase.phase }}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">{{ phase.first_seen[:10] }}</div>
+      </div>
+      {% if not loop.last %}<div style="color:var(--muted);font-size:16px;margin:0 4px">→</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Narrative -->
+{% if result.narrative %}
+<div class="card" style="margin-bottom:14px;border-color:rgba(0,136,255,.3)">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent2);font-family:'Share Tech Mono',monospace;margin-bottom:10px">📋 INVESTIGATION NARRATIVE</div>
+  <div style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap">{{ result.narrative }}</div>
+</div>
+{% endif %}
+
+<!-- Timeline events -->
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent)">
+    CHRONOLOGICAL EVENTS ({{ result.total_events }})
+  </div>
+  <table>
+    <tr><th>Timestamp</th><th>Phase</th><th>Event</th><th>File</th><th>Severity</th></tr>
+    {% for ev in result.events[:100] %}
+    {% set sc = 'badge-danger' if ev.severity=='CRITICAL' else 'badge-warn' if ev.severity=='HIGH' else 'badge-info' if ev.severity=='MEDIUM' else 'badge-safe' %}
+    <tr>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap">{{ ev.timestamp }}</td>
+      <td><span class="badge badge-info" style="font-size:9px">{{ ev.phase[:20] }}</span></td>
+      <td style="font-size:11px">{{ ev.event_type.replace('_',' ') }}</td>
+      <td style="font-size:11px;color:var(--text)">{{ ev.filename[:40] }}</td>
+      <td><span class="badge {{ sc }}" style="font-size:9px">{{ ev.severity }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+  <div style="font-size:48px;margin-bottom:12px">⏱</div>
+  <p>No timeline events yet. Upload evidence files to reconstruct the attack timeline.</p>
+</div>
+{% endif %}
+{% endblock %}

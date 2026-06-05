@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Evidence Correlation{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Evidence Correlation Engine</h1><p>// LINK EVIDENCE VIA IPs · DOMAINS · EMAILS · HASHES · WALLETS</p></div>
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value">{{result.total_files}}</div><div class="stat-label">Files Analysed</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{result.total_links}}</div><div class="stat-label">Relationships</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{result.total_clusters}}</div><div class="stat-label">Clusters</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{result.alerts|length}}</div><div class="stat-label">Alerts</div></div>
+</div>
+{% if result.alerts %}
+<div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">⚠ CORRELATION ALERTS</div>
+  {% for a in result.alerts %}<div style="font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">● {{a}}</div>{% endfor %}
+</div>{% endif %}
+<!-- Shared IOCs -->
+{% if result.shared_iocs %}
+<div class="card" style="margin-bottom:14px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Shared IOCs Across Evidence Files</div>
+  <table><tr><th>Type</th><th>Value</th><th>Files</th><th>Weight</th></tr>
+  {% for ioc_type, items in result.shared_iocs.items() %}
+  {% for item in items[:8] %}
+  <tr>
+    <td><span class="badge badge-warn" style="font-size:9px">{{ioc_type.upper()}}</span></td>
+    <td style="font-family:'Share Tech Mono',monospace;font-size:11px;word-break:break-all">{{item.value[:60]}}</td>
+    <td><span class="badge {% if item.files>=3 %}badge-danger{% else %}badge-warn{% endif %}">{{item.files}} files</span></td>
+    <td style="font-family:'Share Tech Mono',monospace;font-size:11px">{{item.weight}}</td>
+  </tr>
+  {% endfor %}{% endfor %}</table>
+</div>{% endif %}
+<!-- File nodes -->
+<div class="card">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">File Correlation Scores</div>
+  <table><tr><th>File</th><th>Case</th><th>IOCs</th><th>Corr Score</th><th>Cluster</th></tr>
+  {% for node in result.nodes|sort(attribute='corr_score',reverse=True) %}
+  <tr>
+    <td>{{node.name}}</td>
+    <td class="hash-cell">{{node.case_id}}</td>
+    <td style="font-family:'Share Tech Mono',monospace">{{node.ioc_count}}</td>
+    <td><span style="color:{% if node.corr_score>50 %}var(--danger){% elif node.corr_score>20 %}var(--warn){% else %}var(--safe){% endif %};font-family:'Share Tech Mono',monospace">{{node.corr_score}}</span></td>
+    <td><span class="badge badge-info" style="font-size:9px">Cluster {{node.cluster}}</span></td>
+  </tr>{% endfor %}</table>
+</div>
+{% endblock %}

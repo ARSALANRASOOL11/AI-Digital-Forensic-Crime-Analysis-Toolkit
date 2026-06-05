@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}MITRE ATT&CK Mapping{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>MITRE ATT&CK Mapping</h1>
+  <p>// MAP EVIDENCE TO ATT&CK TECHNIQUES · TACTIC COVERAGE · NAVIGATOR EXPORT</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent)">{{ result.technique_count }}</div><div class="stat-label">Techniques</div></div>
+  <div class="stat-card"><div class="stat-value">{{ result.tactic_counts|length }}</div><div class="stat-label">Tactics</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.file_mappings|length }}</div><div class="stat-label">Files Mapped</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ result.top_techniques|length }}</div><div class="stat-label">Top Techniques</div></div>
+</div>
+
+{% if result.tactic_counts %}
+<!-- Tactic coverage -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:14px">Tactic Coverage</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for tactic, count in result.tactic_counts.items() %}
+    {% set color = result.tactic_colors.get(tactic,'#888') %}
+    <div style="padding:6px 14px;border:1px solid {{color}}44;border-radius:20px;background:{{color}}11">
+      <span style="font-size:11px;color:{{color}};font-family:'Share Tech Mono',monospace">{{ tactic }}</span>
+      <span style="font-size:10px;color:var(--muted);margin-left:6px">×{{ count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Top techniques -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Detected ATT&CK Techniques</div>
+  <table>
+    <tr><th>ID</th><th>Technique</th><th>Tactics</th><th>Confidence</th><th>Found In</th><th>Link</th></tr>
+    {% for tech in result.all_techniques %}
+    <tr>
+      <td><span class="badge badge-danger" style="font-size:9px;font-family:'Share Tech Mono',monospace">{{ tech.id }}</span></td>
+      <td style="font-weight:600;font-size:12px">{{ tech.name }}</td>
+      <td>
+        {% for tactic in tech.tactics[:2] %}
+        {% set color = result.tactic_colors.get(tactic,'#888') %}
+        <span style="font-size:9px;padding:2px 6px;border-radius:3px;background:{{color}}22;color:{{color}};font-family:'Share Tech Mono',monospace;margin-right:3px">{{ tactic[:12] }}</span>
+        {% endfor %}
+      </td>
+      <td>
+        <div style="width:80px;background:rgba(255,255,255,.05);border-radius:3px;height:6px;display:inline-block;vertical-align:middle">
+          <div style="width:{{ tech.confidence }}%;height:6px;border-radius:3px;background:{% if tech.confidence>=80 %}var(--danger){% elif tech.confidence>=50 %}var(--warn){% else %}var(--accent2){% endif %}"></div>
+        </div>
+        <span style="font-size:10px;color:var(--muted);margin-left:4px">{{ tech.confidence }}%</span>
+      </td>
+      <td style="font-size:11px;color:var(--muted)">
+        {% for f in tech.files[:2] %}{{ f.name[:20] }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {% if tech.files|length > 2 %} +{{ tech.files|length - 2 }}{% endif %}
+      </td>
+      <td><a href="{{ tech.url }}" target="_blank" style="color:var(--accent);font-size:10px;font-family:'Share Tech Mono',monospace">VIEW ↗</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- Per-file mapping -->
+<div class="card" style="margin-bottom:18px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:12px">Per-File ATT&CK Mapping</div>
+  <table>
+    <tr><th>File</th><th>Case</th><th>Techniques Found</th><th>Tactics</th><th>Score</th></tr>
+    {% for fm in result.file_mappings %}
+    <tr>
+      <td>{{ fm.filename }}</td>
+      <td class="hash-cell">{{ fm.case_id }}</td>
+      <td>
+        {% for t in fm.techniques[:4] %}
+        <span class="badge badge-danger" style="font-size:9px;margin:1px">{{ t.id }}</span>
+        {% endfor %}
+        {% if fm.techniques|length > 4 %}<span style="font-size:10px;color:var(--muted)">+{{ fm.techniques|length - 4 }}</span>{% endif %}
+      </td>
+      <td style="font-size:10px;color:var(--muted)">{{ fm.tactics[:3]|join(', ') }}</td>
+      <td>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:12px;color:{% if fm.score>=60 %}var(--danger){% elif fm.score>=30 %}var(--warn){% else %}var(--safe){% endif %}">{{ fm.score }}</span>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ATT&CK Navigator export -->
+<div class="card" style="border-color:rgba(0,255,136,.3)">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--safe);font-family:'Share Tech Mono',monospace;margin-bottom:10px">📥 ATT&CK NAVIGATOR LAYER EXPORT</div>
+  <p style="font-size:12px;color:var(--text);margin-bottom:10px">Copy this JSON into <a href="https://mitre-attack.github.io/attack-navigator/" target="_blank" style="color:var(--accent)">ATT&CK Navigator</a> → Open Existing Layer.</p>
+  <textarea style="width:100%;height:120px;background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text)" readonly>{{ result.navigator_layer | tojson(indent=2) }}</textarea>
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+  <div style="font-size:48px;margin-bottom:12px">🎯</div>
+  <p>No ATT&CK techniques detected yet. Upload malware or suspicious files to generate mappings.</p>
+</div>
+{% endif %}
+{% endblock %}

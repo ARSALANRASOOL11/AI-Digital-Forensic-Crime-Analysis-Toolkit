@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}File Carving — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>File Carving</h1>
+  <p>// MAGIC BYTE SIGNATURE RECOVERY &mdash; EMBEDDED FILE DETECTION</p>
+</div>
+
+<div style="display:grid;grid-template-columns:270px 1fr;gap:18px;align-items:start">
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Select Evidence File</div>
+    {% for r in all_rows %}
+    <a href="{{ url_for('carve', ev_id=r[0]) }}" style="text-decoration:none">
+      <div class="card" style="padding:10px 14px;margin-bottom:7px;cursor:pointer;{% if r[0] == ev_id %}border-color:var(--accent);background:rgba(0,255,231,.06){% endif %}">
+        <div style="font-size:12px;color:#fff">{{ r[2] }}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{ r[1] }} &bull; {{ r[6] if r|length > 6 else 'Unclassified' }}</div>
+      </div>
+    </a>
+    {% else %}
+    <p style="color:var(--muted);font-size:13px">No evidence uploaded yet.</p>
+    {% endfor %}
+  </div>
+
+  <div>
+    {% if selected %}
+      {% if carved %}
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:11px 16px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent)">
+          &#128268; {{ carved|length }} EMBEDDED SIGNATURE(S) FOUND IN {{ selected[2] }}
+        </div>
+        <table>
+          <tr><th>Offset</th><th>Ext</th><th>Type</th><th>Size</th><th>Hex Preview</th></tr>
+          {% for item in carved %}
+          <tr>
+            <td style="font-family:'Share Tech Mono',monospace;color:var(--accent)">{{ item.offset }}</td>
+            <td><span class="badge badge-warn">{{ item.extension }}</span></td>
+            <td>{{ item.description }}</td>
+            <td style="font-family:'Share Tech Mono',monospace;font-size:10px">{{ item.size_bytes }} B</td>
+            <td style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);word-break:break-all">{{ item.hex_preview }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% else %}
+      <div class="card" style="text-align:center;padding:30px">
+        <div style="font-size:32px;margin-bottom:10px">&#10004;</div>
+        <div style="color:var(--safe);font-family:'Share Tech Mono',monospace">NO EMBEDDED SIGNATURES FOUND</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:6px">No recoverable file headers detected in <strong>{{ selected[2] }}</strong>.</div>
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:12px">&#128268;</div>
+      Select an evidence file on the left to run magic-byte file carving.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

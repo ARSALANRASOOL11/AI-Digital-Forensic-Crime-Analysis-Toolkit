@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}AI Investigation Assistant — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>AI Investigation Assistant</h1>
+  <p>// POWERED BY OLLAMA · LLAMA 3 · MISTRAL · GEMMA — WITH OFFLINE FALLBACK</p>
+</div>
+
+<!-- Ollama status banner -->
+<div class="card" style="margin-bottom:18px;padding:12px 18px;border-color:{% if ollama_status.available %}rgba(0,255,136,.3){% else %}rgba(0,136,255,.3){% endif %}">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="status-dot" style="background:{% if ollama_status.available %}var(--safe){% else %}var(--accent2){% endif %}"></div>
+    <span style="font-size:11px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;color:{% if ollama_status.available %}var(--safe){% else %}var(--accent2){% endif %}">
+      {% if ollama_status.available %}
+        OLLAMA ONLINE — Models: {{ ollama_status.models|join(', ') }}
+      {% else %}
+        OFFLINE MODE — Built-in forensic analyst active · <a href="https://ollama.ai" target="_blank" style="color:var(--accent)">Install Ollama</a> for full LLM power
+      {% endif %}
+    </span>
+    {% if not ollama_status.available %}
+    <div style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)">
+      ollama serve &amp;&amp; ollama pull llama3
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 280px;gap:18px;align-items:start">
+
+  <!-- Chat panel -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div class="status-dot" style="background:{% if ollama_status.available %}var(--safe){% else %}var(--accent2){% endif %}"></div>
+      <span style="font-size:11px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;color:var(--accent)">
+        {% if ollama_status.available %}
+          AI ANALYST · {{ ollama_status.models[0] if ollama_status.models else 'LLM' }}
+        {% else %}
+          AI ANALYST · BUILT-IN MODE
+        {% endif %}
+      </span>
+      <button onclick="clearChat()" class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px">Clear</button>
+    </div>
+
+    <div class="chat-box" style="height:460px">
+      <div class="chat-messages" id="chatMsgs">
+        <div class="chat-msg ai">
+          <div class="ai-label">🤖 AI FORENSIC ANALYST</div>
+          {% if ollama_status.available %}
+          I'm running on <strong>{{ ollama_status.models[0] if ollama_status.models else 'Ollama' }}</strong> with full access to your evidence database.
+          I can analyse patterns, explain attack chains, identify TTPs, and guide your investigation.
+          {% else %}
+          I'm running in offline mode with the built-in forensic analyst.
+          I have full access to your evidence database and can answer questions about risk scores,
+          tampered files, crime types, and investigation priorities.<br><br>
+          Install <a href="https://ollama.ai" target="_blank" style="color:var(--accent)">Ollama</a>
+          and run <code style="background:var(--panel);padding:2px 6px;border-radius:3px">ollama pull llama3</code>
+          for advanced natural language AI analysis.
+          {% endif %}
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="aiChatInput"
+               placeholder="Ask anything about your evidence…"
+               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiChat()}">
+        <button class="btn btn-primary btn-sm" onclick="sendAiChat()" id="sendBtn">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar: sample questions + info -->
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+      Sample Questions
+    </div>
+    {% set questions = [
+      "Give me a full case briefing",
+      "Which files are tampered?",
+      "What crime types are in my evidence?",
+      "Show me all HIGH RISK files",
+      "What MITRE ATT&CK techniques apply?",
+      "What should I investigate first?",
+      "Are there any ransomware indicators?",
+      "Explain the attack chain",
+      "Which cases are linked?",
+      "Generate an executive summary"
+    ] %}
+    {% for q in questions %}
+    <button onclick="injectQuestion('{{ q }}')"
+            class="btn btn-ghost"
+            style="width:100%;justify-content:flex-start;font-size:11px;text-align:left;padding:7px 11px;margin-bottom:5px">
+      {{ q }}
+    </button>
+    {% endfor %}
+
+    <div style="margin-top:18px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace;line-height:1.8">
+      ● Reads your live evidence database<br>
+      ● {% if ollama_status.available %}Full LLM: {{ ollama_status.models|length }} model(s){% else %}Rule-based analyst offline{% endif %}<br>
+      ● MITRE ATT&amp;CK knowledge base<br>
+      ● IOC &amp; risk correlation<br>
+      ● Investigation prioritisation<br>
+      ● Conversation memory (6 turns)
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let chatHistory = [];
+
+async function sendAiChat() {
+  const input = document.getElementById('aiChatInput');
+  const btn   = document.getElementById('sendBtn');
+  const msg   = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  const box = document.getElementById('chatMsgs');
+  appendAiMsg(box, 'user', msg);
+
+  const aiDiv = appendAiMsg(box, 'ai',
+    '<div class="ai-label">🤖 AI ANALYST</div><span style="color:var(--muted)">Analysing evidence database…</span>');
+  box.scrollTop = box.scrollHeight;
+
+  try {
+    const res  = await fetch('/api/ai_chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRF-Token': getCsrfToken()},
+      body: JSON.stringify({message: msg, history: chatHistory})
+    });
+    const data = await res.json();
+    const reply = data.reply || 'No response.';
+    const source = data.source || '';
+    const model  = data.model  || '';
+
+    // Render markdown-lite
+    const rendered = renderMarkdown(reply);
+    aiDiv.innerHTML = `<div class="ai-label">🤖 AI ANALYST${model ? ' · ' + model : ''}${source==='ollama'?' <span style="color:var(--safe);font-size:9px">●LLM</span>':' <span style="color:var(--accent2);font-size:9px">●BUILT-IN</span>'}</div>${rendered}`;
+
+    chatHistory.push({question: msg, answer: reply});
+    if (chatHistory.length > 10) chatHistory.shift();
+  } catch(e) {
+    aiDiv.innerHTML = '<div class="ai-label">🤖 AI ANALYST</div><span style="color:var(--danger)">Connection error: ' + e.message + '</span>';
+  }
+  btn.disabled = false;
+  btn.textContent = 'SEND';
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendAiMsg(container, type, html) {
+  const d = document.createElement('div');
+  d.className = 'chat-msg ' + type;
+  d.innerHTML = html;
+  container.appendChild(d);
+  return d;
+}
+
+function injectQuestion(q) {
+  document.getElementById('aiChatInput').value = q;
+  sendAiChat();
+}
+
+function clearChat() {
+  chatHistory = [];
+  const box = document.getElementById('chatMsgs');
+  box.innerHTML = '<div class="chat-msg ai"><div class="ai-label">🤖 AI ANALYST</div>Chat cleared. Ask me anything about your evidence.</div>';
+}
+
+function renderMarkdown(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code style="background:var(--panel);padding:1px 5px;border-radius:3px;font-family:\'Share Tech Mono\',monospace">$1</code>')
+    .replace(/^## (.+)$/gm, '<div style="font-size:13px;font-weight:800;color:var(--accent);margin:10px 0 5px;letter-spacing:1px">$1</div>')
+    .replace(/^### (.+)$/gm, '<div style="font-size:12px;font-weight:700;color:#fff;margin:8px 0 4px">$1</div>')
+    .replace(/^- (.+)$/gm, '<div style="padding:2px 0;padding-left:12px;position:relative"><span style="position:absolute;left:0;color:var(--accent)">●</span>$1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+</script>
+{% endblock %}

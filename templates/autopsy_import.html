@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Autopsy Import — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Autopsy Export Import</h1>
+  <p>// PARSE AUTOPSY CASE EXPORTS — BODY / CSV / XML / JSON</p>
+</div>
+
+<div class="card" style="max-width:560px;margin-bottom:18px;padding:14px 18px;border-color:rgba(0,136,255,.3)">
+  <div style="font-size:11px;letter-spacing:1px;color:var(--accent2);font-family:'Share Tech Mono',monospace;margin-bottom:6px">SUPPORTED FORMATS</div>
+  <p style="font-size:12px;color:var(--text);line-height:1.8">
+    &#9679; <strong>.body</strong> — mactime / fls body file (timestamp + inode data)<br>
+    &#9679; <strong>.csv</strong> — Autopsy artifact export (Keyword Hits, EXIF, Web History, USB, etc.)<br>
+    &#9679; <strong>.xml</strong> — Autopsy full XML report<br>
+    &#9679; <strong>.json</strong> — Autopsy JSON report (newer versions)<br>
+    &#9679; <strong>.txt</strong> — Keyword hits text file
+  </p>
+</div>
+
+<div class="card" style="max-width:480px;margin-bottom:24px">
+  <form method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="file-drop" onclick="document.getElementById('af').click()">
+      <div style="font-size:32px;margin-bottom:8px">&#128230;</div>
+      <p>Click to select Autopsy export file</p>
+      <p id="afn" style="color:var(--accent);font-size:12px;font-family:'Share Tech Mono',monospace;margin-top:5px"></p>
+      <input type="file" id="af" name="autopsy_file" style="display:none"
+             accept=".body,.csv,.xml,.json,.txt,.js"
+             onchange="document.getElementById('afn').textContent=this.files[0]?.name||''">
+    </div><br>
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">&#128230; PARSE AUTOPSY EXPORT</button>
+  </form>
+</div>
+
+{% if result %}
+{% set ts = result.threat_score %}
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value" style="color:{% if ts >= 70 %}var(--danger){% elif ts >= 30 %}var(--warn){% else %}var(--safe){% endif %}">{{ ts }}</div>
+    <div class="stat-label">Threat Score</div>
+  </div>
+  <div class="stat-card"><div class="stat-value">{{ result.total_artifacts }}</div><div class="stat-label">Artifacts</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.by_severity.CRITICAL }}</div><div class="stat-label">Critical</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--warn)">{{ result.by_severity.HIGH }}</div><div class="stat-label">High</div></div>
+  <div class="stat-card"><div class="stat-value" style="color:var(--accent2)">{{ result.suspicious_count }}</div><div class="stat-label">Suspicious</div></div>
+  <div class="stat-card"><div class="stat-value">{{ result.iocs|length }}</div><div class="stat-label">IOCs</div></div>
+</div>
+
+{% if result.alerts %}
+<div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:10px">&#9888; ALERTS</div>
+  {% for alert in result.alerts %}
+  <div style="font-size:12px;color:var(--text);padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">&#9679; {{ alert }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if result.iocs %}
+<div class="card" style="margin-bottom:14px">
+  <div style="font-size:11px;letter-spacing:2px;color:var(--accent);font-family:'Share Tech Mono',monospace;margin-bottom:10px">&#128269; EXTRACTED IOCs ({{ result.iocs|length }})</div>
+  <table>
+    <tr><th>Type</th><th>Value</th><th>Context</th></tr>
+    {% for ioc in result.iocs[:30] %}
+    <tr>
+      <td><span class="badge {% if ioc.type in ('SHA-256','SHA-1','MD5') %}badge-warn{% else %}badge-info{% endif %}">{{ ioc.type }}</span></td>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:11px;word-break:break-all">{{ ioc.value[:80] }}</td>
+      <td style="font-size:11px;color:var(--muted)">{{ ioc.context[:40] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if result.events %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent)">
+    TIMELINE — {{ result.events|length }} EVENTS ({{ result.filename }})
+  </div>
+  <table>
+    <tr><th>Timestamp</th><th>Artifact Type</th><th>Severity</th><th>Value</th><th>Suspicious</th></tr>
+    {% for ev in result.events[:100] %}
+    {% if ev.severity == 'CRITICAL' %}{% set scls = 'badge-danger' %}
+    {% elif ev.severity == 'HIGH' %}{% set scls = 'badge-warn' %}
+    {% elif ev.severity == 'MEDIUM' %}{% set scls = 'badge-info' %}
+    {% else %}{% set scls = 'badge-safe' %}{% endif %}
+    <tr {% if ev.suspicious %}style="background:rgba(255,184,0,.04)"{% endif %}>
+      <td style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap">{{ ev.timestamp }}</td>
+      <td><span class="badge badge-info" style="font-size:9px">{{ ev.artifact_type }}</span></td>
+      <td><span class="badge {{ scls }}" style="font-size:9px">{{ ev.severity }}</span></td>
+      <td style="font-size:11px;max-width:300px;word-break:break-all">{{ ev.value[:100] }}</td>
+      <td style="text-align:center">{% if ev.suspicious %}<span style="color:var(--danger)">&#9888;</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

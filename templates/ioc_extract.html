@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}IOC Extraction — Forensic Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>IOC Extraction</h1>
+  <p>// AUTOMATIC INDICATOR OF COMPROMISE EXTRACTION + THREAT INTEL ENRICHMENT</p>
+</div>
+
+<div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
+
+  <!-- File list -->
+  <div>
+    <div style="font-size:10px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">Select Evidence File</div>
+    <form method="POST" id="iocForm">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% for r in ev_rows %}
+      <div class="card" style="padding:10px 14px;margin-bottom:7px;cursor:pointer;{% if result and result.filename == r[2] %}border-color:var(--accent);background:rgba(0,255,231,.06){% endif %}"
+           onclick="document.getElementById('evId').value='{{ r[0] }}';document.getElementById('iocForm').submit()">
+        <div style="font-size:12px;color:#fff">{{ r[2] }}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{ r[1] }}</div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:13px">No evidence uploaded yet.</p>
+      {% endfor %}
+      <input type="hidden" name="ev_id" id="evId">
+    </form>
+
+    <div style="margin-top:14px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+      <div style="font-size:10px;letter-spacing:1px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:8px">EXTRACTS</div>
+      {% for label in ['IPv4 / IPv6','Domains & URLs','Email Addresses','MD5 / SHA1 / SHA256','Registry Keys','File Paths','CVE IDs','MITRE ATT&CK TTPs','Bitcoin / Monero','Mutexes','User-Agents','Base64 Payloads','PowerShell Encoded Cmds'] %}
+      <div style="font-size:10px;color:var(--text);margin-bottom:2px;font-family:'Share Tech Mono',monospace">&#9679; {{ label }}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div>
+    {% if not result %}
+    <div class="card" style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:12px">&#128269;</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px">Select a File to Extract IOCs</div>
+      <p style="font-size:12px">Click any evidence file on the left to automatically extract and classify all IOCs.</p>
+    </div>
+    {% else %}
+
+    <!-- Header stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value">{{ result.total_iocs }}</div><div class="stat-label">Total IOCs</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">{{ result.high_confidence }}</div><div class="stat-label">High Confidence</div></div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:{% if result.threat_score >= 70 %}var(--danger){% elif result.threat_score >= 30 %}var(--warn){% else %}var(--safe){% endif %}">
+          {{ result.threat_score }}
+        </div>
+        <div class="stat-label">Threat Score</div>
+      </div>
+      <div class="stat-card"><div class="stat-value">{{ (result.bytes_read / 1024)|round(1) }} KB</div><div class="stat-label">Bytes Scanned</div></div>
+    </div>
+
+    {% if result.alerts %}
+    <div class="card" style="border-color:rgba(255,60,60,.3);margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;margin-bottom:8px">&#9888; THREAT ALERTS ({{ result.alerts|length }})</div>
+      {% for alert in result.alerts %}
+      <div style="font-size:12px;color:var(--text);padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        {% if 'CRITICAL' in alert %}<span class="badge badge-danger" style="font-size:9px;margin-right:6px">CRITICAL</span>
+        {% elif 'HIGH' in alert %}<span class="badge badge-warn" style="font-size:9px;margin-right:6px">HIGH</span>
+        {% else %}<span class="badge badge-info" style="font-size:9px;margin-right:6px">INFO</span>{% endif %}
+        {{ alert }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- IOC categories -->
+    {% set iocs = result.iocs %}
+
+    {% macro ioc_table(title, items, show_cols) %}
+    {% if items %}
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+        {{ title }} ({{ items|length }})
+      </div>
+      <table>
+        <tr>
+          {% for col in show_cols %}<th>{{ col }}</th>{% endfor %}
+          <th>Confidence</th><th>Context</th>
+        </tr>
+        {% for item in items[:20] %}
+        {% set conf = item.get('confidence','LOW') %}
+        {% if conf == 'CRITICAL' %}{% set ccls='badge-danger' %}
+        {% elif conf == 'HIGH' %}{% set ccls='badge-warn' %}
+        {% elif conf == 'MEDIUM' %}{% set ccls='badge-info' %}
+        {% else %}{% set ccls='badge-safe' %}{% endif %}
+        <tr {% if item.get('suspicious') %}style="background:rgba(255,184,0,.04)"{% endif %}>
+          {% for col in show_cols %}
+          {% set field = col.lower().replace(' ','_').replace('-','') %}
+          <td style="font-family:'Share Tech Mono',monospace;font-size:11px;word-break:break-all">
+            {{ item.get(field, item.get('value',''))[:80] }}
+          </td>
+          {% endfor %}
+          <td><span class="badge {{ ccls }}" style="font-size:9px">{{ conf }}</span></td>
+          <td style="font-size:10px;color:var(--muted)">{{ item.get('context','')[:40] }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% endmacro %}
+
+    {{ ioc_table('IPv4 Addresses',       iocs.ipv4,        ['Value','Defanged']) }}
+    {{ ioc_table('Domains',              iocs.domains,     ['Value','Defanged']) }}
+    {{ ioc_table('URLs',                 iocs.urls,        ['Value']) }}
+    {{ ioc_table('Email Addresses',      iocs.emails,      ['Value']) }}
+    {{ ioc_table('SHA-256 Hashes',       iocs.sha256,      ['Value']) }}
+    {{ ioc_table('MD5 Hashes',           iocs.md5,         ['Value']) }}
+    {{ ioc_table('MITRE ATT&CK TTPs',    iocs.attack_ttps, ['Value','Tactic']) }}
+    {{ ioc_table('CVE Identifiers',      iocs.cves,        ['Value']) }}
+    {{ ioc_table('Registry Keys',        iocs.registry_keys,['Value']) }}
+    {{ ioc_table('Windows File Paths',   iocs.win_paths,   ['Value']) }}
+    {{ ioc_table('Bitcoin Addresses',    iocs.bitcoin,     ['Value']) }}
+    {{ ioc_table('Monero Addresses',     iocs.monero,      ['Value']) }}
+    {{ ioc_table('Mutex Names',          iocs.mutexes,     ['Value']) }}
+    {{ ioc_table('User-Agents',          iocs.user_agents, ['Value']) }}
+    {{ ioc_table('Embedded EXE Refs',    iocs.embedded_exes,['Value']) }}
+
+    {% if iocs.ps_encoded %}
+    <div class="card" style="margin-bottom:14px;border-color:rgba(255,60,60,.3)">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--danger);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+        &#9888; ENCODED POWERSHELL COMMANDS ({{ iocs.ps_encoded|length }})
+      </div>
+      {% for ps in iocs.ps_encoded %}
+      <div style="margin-bottom:12px;padding:10px;background:rgba(255,60,60,.06);border:1px solid rgba(255,60,60,.2);border-radius:6px">
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:5px">ENCODED:</div>
+        <div style="font-size:11px;color:var(--text);word-break:break-all;font-family:'Share Tech Mono',monospace;margin-bottom:8px">{{ ps.value }}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:5px">DECODED:</div>
+        <div style="font-size:11px;color:var(--danger);word-break:break-all;font-family:'Share Tech Mono',monospace">{{ ps.decoded[:300] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if iocs.base64_blobs %}
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--warn);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+        BASE64 PAYLOADS ({{ iocs.base64_blobs|length }})
+      </div>
+      {% for b64 in iocs.base64_blobs %}
+      <div style="margin-bottom:10px;padding:10px;background:{% if b64.suspicious %}rgba(255,60,60,.06){% else %}var(--panel){% endif %};border:1px solid var(--border);border-radius:6px">
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:4px">BASE64 BLOB:</div>
+        <div style="font-size:11px;color:var(--muted);word-break:break-all;font-family:'Share Tech Mono',monospace;margin-bottom:6px">{{ b64.value }}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-bottom:4px">DECODED PREVIEW:</div>
+        <div style="font-size:11px;color:{% if b64.suspicious %}var(--danger){% else %}var(--text){% endif %};font-family:'Share Tech Mono',monospace;word-break:break-all">{{ b64.decoded_preview[:150] }}</div>
+        {% if b64.suspicious %}<span class="badge badge-danger" style="font-size:9px;margin-top:5px">SUSPICIOUS</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Auto TI results for hashes -->
+    {% if result.ti_results %}
+    <div class="card" style="border-color:rgba(0,136,255,.3)">
+      <div style="font-size:11px;letter-spacing:2px;color:var(--accent2);font-family:'Share Tech Mono',monospace;text-transform:uppercase;margin-bottom:10px">
+        &#128248; AUTO THREAT INTEL — EXTRACTED HASHES
+      </div>
+      {% for ti in result.ti_results %}
+      <div style="margin-bottom:12px;padding:10px;background:var(--panel);border:1px solid var(--border);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="badge {% if ti.severity == 'CRITICAL' %}badge-danger{% elif ti.severity == 'HIGH' %}badge-warn{% else %}badge-safe{% endif %}">{{ ti.severity }}</span>
+          <span style="font-size:11px;color:var(--muted);font-family:'Share Tech Mono',monospace">{{ ti.value[:48] }}</span>
+          <span style="font-size:10px;color:var(--muted);margin-left:auto">{{ ti.sources_hit }}/{{ ti.sources_checked }} sources</span>
+        </div>
+        {% for alert in ti.alerts %}
+        <div style="font-size:11px;color:var(--text);margin-bottom:2px">&#9679; {{ alert }}</div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

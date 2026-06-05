@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>Forensic Toolkit — Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box scanline-container">
+    <div class="login-icon">&#128269;</div>
+    <div class="login-title">Forensic Toolkit</div>
+    <div class="login-sub">SECURE ACCESS PORTAL &mdash; v4.0</div>
+    <div class="scanner-bar"></div>
+
+    {% if timeout %}
+    <div class="alert alert-warn">&#9888; Session expired due to inactivity. Please log in again.</div>
+    {% endif %}
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" name="username" placeholder="Enter username"
+               autocomplete="off" required maxlength="64">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" name="password" type="password"
+               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required maxlength="128">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" type="submit">
+        AUTHENTICATE &#8594;
+      </button>
+    </form>
+
+    <p style="text-align:center;font-size:10px;color:var(--muted);margin-top:18px;
+       font-family:'Share Tech Mono',monospace;letter-spacing:1px">
+      Passwords hashed with scrypt &bull; CSRF protected &bull; Session timeout: 30 min
+    </p>
+  </div>
+</div>
+</body>
+</html>
